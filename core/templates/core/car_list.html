@@ -1,0 +1,27 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Каталог автомобилей{% endblock %}
+
+{% block content %}
+<div class="row">
+    {% for car in cars %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            {% if car.image %}
+            <img src="{{ car.image.url }}" class="card-img-top" alt="{{ car.brand }} {{ car.model }}">
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title">{{ car.brand }} {{ car.model }}</h5>
+                <p class="card-text">{{ car.year }} год</p>
+                <p class="h4">{{ car.price }} ₽</p>
+                <a href="{% url 'core:car_detail' car.id %}" class="btn btn-primary">Подробнее</a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <p>Автомобили не найдены.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
