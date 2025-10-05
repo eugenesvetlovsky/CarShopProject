@@ -12,11 +12,85 @@
 {% endblock %}
 
 {% block content %}
+<!-- Фильтры -->
+<div class="card mb-4 shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-funnel"></i> Фильтры и поиск</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{% url 'core:car_list' %}" id="filterForm">
+            <div class="row g-3">
+                <!-- Поиск по марке -->
+                <div class="col-md-3">
+                    <label class="form-label"><i class="bi bi-search"></i> Марка</label>
+                    <input type="text" name="brand" class="form-control" placeholder="Например: BMW" value="{{ filters.brand }}" list="brandsList">
+                    <datalist id="brandsList">
+                        {% for brand in brands %}
+                            <option value="{{ brand }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+                
+                <!-- Цена от -->
+                <div class="col-md-2">
+                    <label class="form-label"><i class="bi bi-currency-dollar"></i> Цена от</label>
+                    <input type="number" name="price_min" class="form-control" placeholder="0" value="{{ filters.price_min }}" min="0">
+                </div>
+                
+                <!-- Цена до -->
+                <div class="col-md-2">
+                    <label class="form-label"><i class="bi bi-currency-dollar"></i> Цена до</label>
+                    <input type="number" name="price_max" class="form-control" placeholder="10000000" value="{{ filters.price_max }}" min="0">
+                </div>
+                
+                <!-- Год от -->
+                <div class="col-md-2">
+                    <label class="form-label"><i class="bi bi-calendar"></i> Год от</label>
+                    <input type="number" name="year_min" class="form-control" placeholder="2000" value="{{ filters.year_min }}" min="1900" max="2025">
+                </div>
+                
+                <!-- Год до -->
+                <div class="col-md-2">
+                    <label class="form-label"><i class="bi bi-calendar"></i> Год до</label>
+                    <input type="number" name="year_max" class="form-control" placeholder="2025" value="{{ filters.year_max }}" min="1900" max="2025">
+                </div>
+                
+                <!-- Кнопки -->
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <label class="form-label"><i class="bi bi-sort-down"></i> Сортировка</label>
+                    <select name="sort" class="form-select" onchange="this.form.submit()">
+                        <option value="-created_at" {% if filters.sort == '-created_at' %}selected{% endif %}>Сначала новые</option>
+                        <option value="created_at" {% if filters.sort == 'created_at' %}selected{% endif %}>Сначала старые</option>
+                        <option value="price" {% if filters.sort == 'price' %}selected{% endif %}>Цена: по возрастанию</option>
+                        <option value="-price" {% if filters.sort == '-price' %}selected{% endif %}>Цена: по убыванию</option>
+                        <option value="year" {% if filters.sort == 'year' %}selected{% endif %}>Год: по возрастанию</option>
+                        <option value="-year" {% if filters.sort == '-year' %}selected{% endif %}>Год: по убыванию</option>
+                        <option value="brand" {% if filters.sort == 'brand' %}selected{% endif %}>По марке (А-Я)</option>
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <a href="{% url 'core:car_list' %}" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-x-circle"></i> Сбросить фильтры
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="row mb-4">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
             <h2>Доступные автомобили</h2>
-            <span class="badge bg-primary rounded-pill fs-6">Всего: {{ cars|length }} авто</span>
+            <span class="badge bg-primary rounded-pill fs-6">Найдено: {{ cars|length }} авто</span>
         </div>
         <hr>
     </div>
