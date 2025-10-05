@@ -1,0 +1,88 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Избранное - CarShop{% endblock %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h1><i class="bi bi-heart-fill"></i> Избранное</h1>
+        <p>Ваши любимые автомобили в одном месте</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>Мои избранные автомобили</h2>
+            <span class="badge bg-danger rounded-pill fs-6">{{ favorites|length }} авто</span>
+        </div>
+        <hr>
+    </div>
+</div>
+
+{% if favorites %}
+<div class="row g-4">
+    {% for favorite in favorites %}
+    <div class="col-lg-4 col-md-6">
+        <div class="card h-100">
+            {% if favorite.car.image %}
+                <img src="{{ favorite.car.image.url }}" class="card-img-top" alt="{{ favorite.car.brand }} {{ favorite.car.model }}">
+            {% else %}
+                <div class="no-image">
+                    <i class="bi bi-car-front"></i>
+                </div>
+            {% endif %}
+            
+            <div class="card-body d-flex flex-column">
+                <div class="mb-2">
+                    <span class="badge bg-secondary">{{ favorite.car.year }} год</span>
+                    {% if favorite.car.available %}
+                        <span class="badge bg-success">В наличии</span>
+                    {% else %}
+                        <span class="badge bg-danger">Продано</span>
+                    {% endif %}
+                </div>
+                
+                <h5 class="card-title">{{ favorite.car.brand }} {{ favorite.car.model }}</h5>
+                
+                {% if favorite.car.description %}
+                    <p class="card-text text-muted small">
+                        {{ favorite.car.description|truncatewords:15 }}
+                    </p>
+                {% endif %}
+                
+                <div class="mt-auto">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="price-badge">{{ favorite.car.price|floatformat:0 }} ₽</span>
+                        <a href="{% url 'core:toggle_favorite' favorite.car.id %}" class="btn btn-sm btn-danger">
+                            <i class="bi bi-heart-fill"></i>
+                        </a>
+                    </div>
+                    <a href="{% url 'core:car_detail' favorite.car.id %}" class="btn btn-primary w-100">
+                        <i class="bi bi-eye"></i> Подробнее
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="row">
+    <div class="col-12">
+        <div class="card text-center p-5">
+            <div class="card-body">
+                <i class="bi bi-heart text-muted" style="font-size: 5rem;"></i>
+                <h3 class="mt-4">Ваш список избранного пуст</h3>
+                <p class="text-muted">Добавьте автомобили в избранное, чтобы не потерять их</p>
+                <a href="{% url 'core:car_list' %}" class="btn btn-primary mt-3">
+                    <i class="bi bi-grid-3x3-gap"></i> Перейти к каталогу
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

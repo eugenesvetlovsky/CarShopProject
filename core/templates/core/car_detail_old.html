@@ -1,0 +1,34 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ car.brand }} {{ car.model }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        {% if car.image %}
+        <img src="{{ car.image.url }}" class="img-fluid rounded" alt="{{ car.brand }} {{ car.model }}">
+        {% endif %}
+    </div>
+    <div class="col-md-6">
+        <h1>{{ car.brand }} {{ car.model }}</h1>
+        <p class="h3 text-primary mb-4">{{ car.price }} ₽</p>
+
+        <div class="mb-4">
+            <h5>Характеристики:</h5>
+            <ul class="list-unstyled">
+                <li><strong>Год выпуска:</strong> {{ car.year }}</li>
+                <li><strong>Статус:</strong> {{ car.get_available_display }}</li>
+            </ul>
+        </div>
+
+        {% if car.description %}
+        <div class="mb-4">
+            <h5>Описание:</h5>
+            <p>{{ car.description }}</p>
+        </div>
+        {% endif %}
+
+        <a href="{% url 'core:car_list' %}" class="btn btn-outline-secondary">Назад к каталогу</a>
+    </div>
+</div>
+{% endblock %}
