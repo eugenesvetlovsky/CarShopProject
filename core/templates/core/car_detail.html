@@ -1,34 +1,141 @@
 {% extends 'core/base.html' %}
 
-{% block title %}{{ car.brand }} {{ car.model }}{% endblock %}
+{% block title %}{{ car.brand }} {{ car.model }} - CarShop{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-6">
-        {% if car.image %}
-        <img src="{{ car.image.url }}" class="img-fluid rounded" alt="{{ car.brand }} {{ car.model }}">
-        {% endif %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'core:car_list' %}">Каталог</a></li>
+        <li class="breadcrumb-item active">{{ car.brand }} {{ car.model }}</li>
+    </ol>
+</nav>
+
+<div class="row g-4">
+    <!-- Image Section -->
+    <div class="col-lg-6">
+        <div class="card">
+            {% if car.image %}
+                <img src="{{ car.image.url }}" class="card-img-top" alt="{{ car.brand }} {{ car.model }}" style="height: 400px; object-fit: cover;">
+            {% else %}
+                <div class="no-image" style="height: 400px;">
+                    <i class="bi bi-car-front"></i>
+                </div>
+            {% endif %}
+        </div>
     </div>
-    <div class="col-md-6">
-        <h1>{{ car.brand }} {{ car.model }}</h1>
-        <p class="h3 text-primary mb-4">{{ car.price }} ₽</p>
 
-        <div class="mb-4">
-            <h5>Характеристики:</h5>
-            <ul class="list-unstyled">
-                <li><strong>Год выпуска:</strong> {{ car.year }}</li>
-                <li><strong>Статус:</strong> {{ car.get_available_display }}</li>
-            </ul>
+    <!-- Details Section -->
+    <div class="col-lg-6">
+        <div class="mb-3">
+            <span class="badge bg-secondary fs-6">{{ car.year }} год</span>
+            {% if car.available %}
+                <span class="badge bg-success fs-6">В наличии</span>
+            {% else %}
+                <span class="badge bg-danger fs-6">Продано</span>
+            {% endif %}
         </div>
 
+        <h1 class="display-5 fw-bold mb-3">{{ car.brand }} {{ car.model }}</h1>
+        
+        <div class="price-badge fs-2 mb-4">
+            <i class="bi bi-tag-fill"></i> {{ car.price|floatformat:0 }} ₽
+        </div>
+
+        <!-- Characteristics -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-speedometer2"></i> Характеристики</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span><i class="bi bi-calendar3 text-primary"></i> <strong>Год выпуска:</strong></span>
+                        <span>{{ car.year }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span><i class="bi bi-building text-primary"></i> <strong>Марка:</strong></span>
+                        <span>{{ car.brand }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span><i class="bi bi-car-front text-primary"></i> <strong>Модель:</strong></span>
+                        <span>{{ car.model }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span><i class="bi bi-check-circle text-primary"></i> <strong>Статус:</strong></span>
+                        <span>
+                            {% if car.available %}
+                                <span class="badge bg-success">Доступен</span>
+                            {% else %}
+                                <span class="badge bg-danger">Продан</span>
+                            {% endif %}
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Description -->
         {% if car.description %}
-        <div class="mb-4">
-            <h5>Описание:</h5>
-            <p>{{ car.description }}</p>
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-file-text"></i> Описание</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-0">{{ car.description }}</p>
+            </div>
         </div>
         {% endif %}
 
-        <a href="{% url 'core:car_list' %}" class="btn btn-outline-secondary">Назад к каталогу</a>
+        <!-- Action Buttons -->
+        <div class="d-grid gap-2">
+            {% if car.available %}
+                <button class="btn btn-primary btn-lg" type="button">
+                    <i class="bi bi-cart-plus"></i> Оформить заказ
+                </button>
+                <button class="btn btn-outline-secondary btn-lg" type="button">
+                    <i class="bi bi-telephone"></i> Связаться с менеджером
+                </button>
+            {% else %}
+                <button class="btn btn-secondary btn-lg" type="button" disabled>
+                    <i class="bi bi-x-circle"></i> Автомобиль продан
+                </button>
+            {% endif %}
+            <a href="{% url 'core:car_list' %}" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-arrow-left"></i> Назад к каталогу
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Additional Info Section -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <i class="bi bi-shield-check text-primary fs-1"></i>
+                        <h5 class="mt-2">Гарантия качества</h5>
+                        <p class="text-muted small">Все автомобили проверены</p>
+                    </div>
+                    <div class="col-md-3">
+                        <i class="bi bi-credit-card text-primary fs-1"></i>
+                        <h5 class="mt-2">Кредит</h5>
+                        <p class="text-muted small">Выгодные условия</p>
+                    </div>
+                    <div class="col-md-3">
+                        <i class="bi bi-arrow-repeat text-primary fs-1"></i>
+                        <h5 class="mt-2">Trade-in</h5>
+                        <p class="text-muted small">Обмен вашего авто</p>
+                    </div>
+                    <div class="col-md-3">
+                        <i class="bi bi-headset text-primary fs-1"></i>
+                        <h5 class="mt-2">Поддержка 24/7</h5>
+                        <p class="text-muted small">Всегда на связи</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
