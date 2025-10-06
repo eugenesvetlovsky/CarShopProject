@@ -1,0 +1,91 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Корзина - CarShop{% endblock %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h1><i class="bi bi-cart"></i> Корзина</h1>
+        <p>Ваши выбранные автомобили</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if cart_items %}
+<div class="row">
+    <div class="col-lg-8">
+        {% for item in cart_items %}
+        <div class="card mb-3 shadow-sm">
+            <div class="row g-0">
+                <div class="col-md-4">
+                    {% if item.car.image %}
+                        <img src="{{ item.car.image.url }}" class="img-fluid rounded-start h-100" style="object-fit: cover;" alt="{{ item.car.brand }} {{ item.car.model }}">
+                    {% else %}
+                        <div class="no-image d-flex align-items-center justify-content-center h-100">
+                            <i class="bi bi-car-front fs-1"></i>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="col-md-8">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="card-title">{{ item.car.brand }} {{ item.car.model }}</h5>
+                                <p class="text-muted mb-2">
+                                    <i class="bi bi-calendar"></i> {{ item.car.year }} год
+                                </p>
+                                {% if item.car.description %}
+                                    <p class="card-text small">{{ item.car.description|truncatewords:20 }}</p>
+                                {% endif %}
+                            </div>
+                            <a href="{% url 'core:remove_from_cart' item.car.id %}" class="btn btn-sm btn-outline-danger" title="Удалить из корзины">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                        <div class="mt-3">
+                            <h4 class="text-primary mb-0">{{ item.car.price|floatformat:0 }} ₽</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow-sm sticky-top" style="top: 20px;">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-receipt"></i> Итого</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-3">
+                    <span>Количество автомобилей:</span>
+                    <strong>{{ cart_items|length }}</strong>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between mb-3">
+                    <h5>Общая стоимость:</h5>
+                    <h5 class="text-primary">{{ total_price|floatformat:0 }} ₽</h5>
+                </div>
+                <a href="{% url 'core:checkout' %}" class="btn btn-success w-100 btn-lg">
+                    <i class="bi bi-check-circle"></i> Оформить заказ
+                </a>
+                <a href="{% url 'core:car_list' %}" class="btn btn-outline-secondary w-100 mt-2">
+                    <i class="bi bi-arrow-left"></i> Продолжить покупки
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-cart-x display-1 text-muted"></i>
+    <h3 class="mt-4">Ваша корзина пуста</h3>
+    <p class="text-muted">Добавьте автомобили в корзину, чтобы оформить заказ</p>
+    <a href="{% url 'core:car_list' %}" class="btn btn-primary mt-3">
+        <i class="bi bi-car-front"></i> Перейти к каталогу
+    </a>
+</div>
+{% endif %}
+{% endblock %}

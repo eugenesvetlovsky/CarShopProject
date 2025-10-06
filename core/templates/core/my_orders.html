@@ -1,0 +1,67 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Мои заказы - CarShop{% endblock %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h1><i class="bi bi-list-ul"></i> Мои заказы</h1>
+        <p>История ваших покупок</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if orders %}
+<div class="row">
+    {% for order in orders %}
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><strong>Заказ #{{ order.id }}</strong></span>
+                <span class="badge 
+                    {% if order.status == 'completed' %}bg-success
+                    {% elif order.status == 'approved' %}bg-info
+                    {% elif order.status == 'pending' %}bg-warning
+                    {% else %}bg-danger{% endif %}">
+                    {{ order.get_status_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        {% if order.car.image %}
+                            <img src="{{ order.car.image.url }}" class="img-fluid rounded" alt="{{ order.car.brand }} {{ order.car.model }}">
+                        {% else %}
+                            <div class="no-image d-flex align-items-center justify-content-center" style="height: 100px;">
+                                <i class="bi bi-car-front fs-1"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-8">
+                        <h5 class="card-title">{{ order.car.brand }} {{ order.car.model }}</h5>
+                        <p class="text-muted mb-1">
+                            <i class="bi bi-calendar"></i> {{ order.car.year }} год
+                        </p>
+                        <h5 class="text-primary mb-3">{{ order.car.price|floatformat:0 }} ₽</h5>
+                        <p class="text-muted small mb-0">
+                            <i class="bi bi-clock"></i> {{ order.created_at|date:"d.m.Y H:i" }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-inbox display-1 text-muted"></i>
+    <h3 class="mt-4">У вас пока нет заказов</h3>
+    <p class="text-muted">Оформите свой первый заказ в нашем каталоге</p>
+    <a href="{% url 'core:car_list' %}" class="btn btn-primary mt-3">
+        <i class="bi bi-car-front"></i> Перейти к каталогу
+    </a>
+</div>
+{% endif %}
+{% endblock %}
