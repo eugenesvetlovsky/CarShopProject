@@ -3,7 +3,10 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from .models import Car, Favorite
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.conf import settings
+from .models import Car, Favorite, Cart, Order
 from .forms import RegisterForm, LoginForm
 
 
@@ -146,3 +149,149 @@ def toggle_favorite(request, car_id):
 def favorites_view(request):
     favorites = Favorite.objects.filter(user=request.user).select_related('car')
     return render(request, 'core/favorites.html', {'favorites': favorites})
+
+
+@login_required
+def add_to_cart(request, car_id):
+    car = get_object_or_404(Car, id=car_id)
+    
+    # Проверяем доступность автомобиля
+    if not car.available:
+        messages.error(request, 'Этот автомобиль уже недоступен для покупки')
+        return redirect(request.META.get('HTTP_REFERER', 'core:car_list'))
+    
+    # Добавляем в корзину или сообщаем, что уже есть
+    cart_item, created = Cart.objects.get_or_create(user=request.user, car=car)
+    
+    if created:
+        messages.success(request, f'{car.brand} {car.model} добавлен в корзину')
+    else:
+        messages.info(request, 'Этот автомобиль уже в вашей корзине')
+    
+    return redirect(request.META.get('HTTP_REFERER', 'core:car_list'))
+
+
+@login_required
+def cart_view(request):
+    cart_items = Cart.objects.filter(user=request.user).select_related('car')
+    
+    # Вычисляем общую стоимость
+    total_price = sum(item.car.price for item in cart_items)
+    
+    context = {
+        'cart_items': cart_items,
+        'total_price': total_price,
+    }
+    
+    return render(request, 'core/cart.html', context)
+
+
+@login_required
+def remove_from_cart(request, car_id):
+    cart_item = get_object_or_404(Cart, user=request.user, car_id=car_id)
+    car_name = f"{cart_item.car.brand} {cart_item.car.model}"
+    cart_item.delete()
+    
+    messages.success(request, f'{car_name} удалён из корзины')
+    return redirect('core:cart')
+
+
+@login_required
+def checkout(request):
+    cart_items = Cart.objects.filter(user=request.user).select_related('car')
+    
+    if not cart_items.exists():
+        messages.warning(request, 'Ваша корзина пуста')
+        return redirect('core:cart')
+    
+    # Создаём заказы для каждого автомобиля в корзине
+    orders = []
+    cars_info = []
+    
+    for cart_item in cart_items:
+        car = cart_item.car
+        
+        # Проверяем доступность
+        if not car.available:
+            messages.error(request, f'{car.brand} {car.model} больше недоступен')
+            continue
+        
+        # Создаём заказ
+        order = Order.objects.create(
+            user=request.user,
+            car=car,
+            status='completed'
+        )
+        orders.append(order)
+        
+        # Делаем автомобиль недоступным
+        car.available = False
+        car.save()
+        
+        # Сохраняем информацию для письма
+        cars_info.append({
+            'brand': car.brand,
+            'model': car.model,
+            'year': car.year,
+            'price': car.price,
+        })
+        
+        # Удаляем из корзины
+        cart_item.delete()
+    
+    if not orders:
+        messages.error(request, 'Не удалось оформить заказ')
+        return redirect('core:cart')
+    
+    # Отправляем email
+    try:
+        subject = f'Подтверждение заказа #{orders[0].id} - CarShop'
+        
+        # HTML версия письма
+        html_message = render_to_string('core/email/order_confirmation.html', {
+            'user': request.user,
+            'cars': cars_info,
+            'total_price': sum(car['price'] for car in cars_info),
+            'order_id': orders[0].id,
+        })
+        
+        # Текстовая версия письма
+        plain_message = f"""
+Здравствуйте, {request.user.username}!
+
+Спасибо за ваш заказ в CarShop!
+
+Детали заказа:
+"""
+        for car in cars_info:
+            plain_message += f"\n- {car['brand']} {car['model']} ({car['year']}) - {car['price']} ₽"
+        
+        plain_message += f"\n\nОбщая стоимость: {sum(car['price'] for car in cars_info)} ₽"
+        plain_message += "\n\nС уважением,\nКоманда CarShop"
+        
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[request.user.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        
+        messages.success(request, f'Заказ успешно оформлен! Письмо с подтверждением отправлено на {request.user.email}')
+    except Exception as e:
+        messages.warning(request, f'Заказ оформлен, но не удалось отправить email: {str(e)}')
+    
+    return redirect('core:order_success', order_id=orders[0].id)
+
+
+@login_required
+def order_success(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    return render(request, 'core/order_success.html', {'order': order})
+
+
+@login_required
+def my_orders(request):
+    orders = Order.objects.filter(user=request.user).select_related('car').order_by('-created_at')
+    return render(request, 'core/my_orders.html', {'orders': orders})

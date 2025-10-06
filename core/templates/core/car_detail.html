@@ -100,9 +100,15 @@
             {% endif %}
             
             {% if car.available %}
-                <button class="btn btn-primary btn-lg" type="button">
-                    <i class="bi bi-cart-plus"></i> Оформить заказ
-                </button>
+                {% if user.is_authenticated %}
+                    <a href="{% url 'core:add_to_cart' car.id %}" class="btn btn-success btn-lg">
+                        <i class="bi bi-cart-plus"></i> Добавить в корзину
+                    </a>
+                {% else %}
+                    <a href="{% url 'core:login' %}" class="btn btn-success btn-lg">
+                        <i class="bi bi-cart-plus"></i> Войдите, чтобы купить
+                    </a>
+                {% endif %}
                 <button class="btn btn-outline-secondary btn-lg" type="button">
                     <i class="bi bi-telephone"></i> Связаться с менеджером
                 </button>

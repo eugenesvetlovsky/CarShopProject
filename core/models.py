@@ -34,6 +34,18 @@ class Order(models.Model):
     def __str__(self):
         return f"Order #{self.id} - {self.car} by {self.user.username}"
 
+class Cart(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cart_items')
+    car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name='in_carts')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'car')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.car}"
+
 class Favorite(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
     car = models.ForeignKey(Car, on_delete=models.CASCADE, related_name='favorited_by')
