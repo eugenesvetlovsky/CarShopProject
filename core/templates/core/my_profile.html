@@ -1,0 +1,169 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Мой профиль - CarShop{% endblock %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="container text-center">
+        <i class="bi bi-person-circle display-1"></i>
+        <h1 class="mt-3">{{ user.username }}</h1>
+        {% if average_rating %}
+            <div class="fs-4 text-warning">
+                {% for i in "12345" %}
+                    {% if forloop.counter <= average_rating %}
+                        <i class="bi bi-star-fill"></i>
+                    {% elif forloop.counter|add:"-0.5" <= average_rating %}
+                        <i class="bi bi-star-half"></i>
+                    {% else %}
+                        <i class="bi bi-star"></i>
+                    {% endif %}
+                {% endfor %}
+                <span class="text-white ms-2">{{ average_rating }}</span>
+            </div>
+        {% else %}
+            <p class="text-white-50">Пока нет рейтинга</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Информация о профиле -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-person"></i> Информация профиля</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong><i class="bi bi-person-badge"></i> Имя пользователя:</strong>
+                    </div>
+                    <div class="col-md-8">
+                        {{ user.username }}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong><i class="bi bi-envelope"></i> Email:</strong>
+                    </div>
+                    <div class="col-md-8">
+                        {{ user.email|default:"Не указан" }}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong><i class="bi bi-calendar"></i> Дата регистрации:</strong>
+                    </div>
+                    <div class="col-md-8">
+                        {{ user.date_joined|date:"d.m.Y" }}
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="d-grid gap-2">
+                    <a href="{% url 'core:edit_profile' %}" class="btn btn-primary">
+                        <i class="bi bi-pencil"></i> Редактировать профиль
+                    </a>
+                    <a href="{% url 'core:change_password' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-key"></i> Изменить пароль
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Статистика -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-body text-center">
+                <i class="bi bi-cart-check display-4 text-success"></i>
+                <h3 class="mt-3">{{ sales_count }}</h3>
+                <p class="text-muted mb-0">Продано автомобилей</p>
+            </div>
+        </div>
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <i class="bi bi-chat-left-text display-4 text-info"></i>
+                <h3 class="mt-3">{{ reviews_count }}</h3>
+                <p class="text-muted mb-0">Получено отзывов</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Быстрые ссылки -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'core:my_listings' %}" class="card shadow-sm text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-card-list display-4 text-primary"></i>
+                <h5 class="mt-3">Мои объявления</h5>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'core:my_orders' %}" class="card shadow-sm text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-list-ul display-4 text-success"></i>
+                <h5 class="mt-3">Мои заказы</h5>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'core:favorites' %}" class="card shadow-sm text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-heart-fill display-4 text-danger"></i>
+                <h5 class="mt-3">Избранное</h5>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'core:cart' %}" class="card shadow-sm text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-cart-fill display-4 text-warning"></i>
+                <h5 class="mt-3">Корзина</h5>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Отзывы обо мне -->
+<div class="mb-5">
+    <h2 class="mb-4"><i class="bi bi-chat-left-text"></i> Отзывы обо мне ({{ reviews_count }})</h2>
+    
+    {% if reviews %}
+        {% for review in reviews %}
+        <div class="card mb-3 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <h5 class="mb-1">
+                            <i class="bi bi-person-circle"></i> {{ review.buyer.username }}
+                        </h5>
+                        <div class="text-warning">
+                            {% for i in "12345" %}
+                                {% if forloop.counter <= review.rating %}
+                                    <i class="bi bi-star-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-star"></i>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <small class="text-muted">{{ review.created_at|date:"d.m.Y" }}</small>
+                </div>
+                <p class="mb-0">{{ review.comment }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info text-center">
+            <i class="bi bi-info-circle fs-3 d-block mb-2"></i>
+            <p class="mb-0">Пока нет отзывов о вас</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

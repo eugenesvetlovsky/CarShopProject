@@ -100,3 +100,49 @@ class ReviewForm(forms.ModelForm):
                 'rows': 4
             })
         }
+
+
+class UserUpdateForm(forms.ModelForm):
+    """Форма для обновления данных пользователя"""
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Email'
+        })
+    )
+    username = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Имя пользователя'
+        })
+    )
+    
+    class Meta:
+        model = User
+        fields = ['username', 'email']
+
+
+class PasswordChangeCustomForm(forms.Form):
+    """Форма для смены пароля"""
+    old_password = forms.CharField(
+        label='Текущий пароль',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите текущий пароль'
+        })
+    )
+    new_password1 = forms.CharField(
+        label='Новый пароль',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите новый пароль'
+        })
+    )
+    new_password2 = forms.CharField(
+        label='Подтверждение пароля',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Повторите новый пароль'
+        })
+    )

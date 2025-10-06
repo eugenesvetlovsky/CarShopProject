@@ -246,9 +246,9 @@
                     </li>
                     {% if user.is_authenticated %}
                     <li class="nav-item">
-                        <span class="nav-link">
-                            <i class="bi bi-person-circle"></i> {{ user.username }}, добро пожаловать!
-                        </span>
+                        <a class="nav-link" href="{% url 'core:my_profile' %}">
+                            <i class="bi bi-person-circle"></i> {{ user.username }}
+                        </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link btn btn-outline-light btn-sm" href="{% url 'core:logout' %}">

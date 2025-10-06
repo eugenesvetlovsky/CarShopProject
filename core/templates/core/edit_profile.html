@@ -1,0 +1,57 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Редактировать профиль - CarShop{% endblock %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h1><i class="bi bi-pencil"></i> Редактировать профиль</h1>
+        <p>Обновите свои данные</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.username.id_for_label }}" class="form-label">
+                            <i class="bi bi-person-badge"></i> Имя пользователя *
+                        </label>
+                        {{ form.username }}
+                        {% if form.username.errors %}
+                            <div class="text-danger small">{{ form.username.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">Это имя будут видеть другие пользователи</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.email.id_for_label }}" class="form-label">
+                            <i class="bi bi-envelope"></i> Email *
+                        </label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                            <div class="text-danger small">{{ form.email.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">На этот email будут приходить уведомления о заказах</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check-circle"></i> Сохранить изменения
+                        </button>
+                        <a href="{% url 'core:my_profile' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

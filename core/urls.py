@@ -29,4 +29,9 @@ urlpatterns = [
     # Профиль продавца и отзывы
     path('seller/<int:user_id>/', views.seller_profile, name='seller_profile'),
     path('seller/<int:seller_id>/review/', views.add_review, name='add_review'),
+    
+    # Личный профиль пользователя
+    path('profile/', views.my_profile, name='my_profile'),
+    path('profile/edit/', views.edit_profile, name='edit_profile'),
+    path('profile/change-password/', views.change_password, name='change_password'),
 ]

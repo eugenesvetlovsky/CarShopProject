@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
@@ -8,7 +8,7 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from django.contrib.auth.models import User
 from .models import Car, Favorite, Cart, Order, Review, UserProfile
-from .forms import RegisterForm, LoginForm, CarForm, ReviewForm
+from .forms import RegisterForm, LoginForm, CarForm, ReviewForm, UserUpdateForm, PasswordChangeCustomForm
 
 
 def car_list(request):
@@ -443,3 +443,71 @@ def add_review(request, seller_id):
         form = ReviewForm()
     
     return render(request, 'core/add_review.html', {'form': form, 'seller': seller})
+
+
+# Профиль пользователя
+@login_required
+def my_profile(request):
+    """Личный профиль пользователя"""
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    
+    # Получаем отзывы о пользователе
+    reviews = Review.objects.filter(seller=request.user).select_related('buyer')
+    
+    context = {
+        'profile': profile,
+        'reviews': reviews,
+        'average_rating': profile.get_average_rating(),
+        'reviews_count': profile.get_reviews_count(),
+        'sales_count': profile.get_sales_count(),
+    }
+    
+    return render(request, 'core/my_profile.html', context)
+
+
+@login_required
+def edit_profile(request):
+    """Редактирование профиля"""
+    if request.method == 'POST':
+        form = UserUpdateForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Профиль успешно обновлен!')
+            return redirect('core:my_profile')
+    else:
+        form = UserUpdateForm(instance=request.user)
+    
+    return render(request, 'core/edit_profile.html', {'form': form})
+
+
+@login_required
+def change_password(request):
+    """Смена пароля"""
+    if request.method == 'POST':
+        form = PasswordChangeCustomForm(request.POST)
+        if form.is_valid():
+            old_password = form.cleaned_data['old_password']
+            new_password1 = form.cleaned_data['new_password1']
+            new_password2 = form.cleaned_data['new_password2']
+            
+            # Проверяем старый пароль
+            if not request.user.check_password(old_password):
+                messages.error(request, 'Неверный текущий пароль')
+            elif new_password1 != new_password2:
+                messages.error(request, 'Новые пароли не совпадают')
+            elif len(new_password1) < 8:
+                messages.error(request, 'Пароль должен содержать минимум 8 символов')
+            else:
+                # Меняем пароль
+                request.user.set_password(new_password1)
+                request.user.save()
+                
+                # Обновляем сессию, чтобы пользователь не вышел из системы
+                update_session_auth_hash(request, request.user)
+                
+                messages.success(request, 'Пароль успешно изменен!')
+                return redirect('core:my_profile')
+    else:
+        form = PasswordChangeCustomForm()
+    
+    return render(request, 'core/change_password.html', {'form': form})
