@@ -1,0 +1,83 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Мои объявления - CarShop{% endblock %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h1><i class="bi bi-card-list"></i> Мои объявления</h1>
+        <p>Управление вашими автомобилями на продажу</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'core:add_car' %}" class="btn btn-success btn-lg">
+        <i class="bi bi-plus-circle"></i> Добавить автомобиль на продажу
+    </a>
+</div>
+
+{% if listings %}
+<div class="row g-4">
+    {% for car in listings %}
+    <div class="col-lg-4 col-md-6">
+        <div class="card h-100">
+            {% if car.image %}
+                <img src="{{ car.image.url }}" class="card-img-top" alt="{{ car.brand }} {{ car.model }}">
+            {% else %}
+                <div class="no-image">
+                    <i class="bi bi-car-front"></i>
+                </div>
+            {% endif %}
+            
+            <div class="card-body d-flex flex-column">
+                <div class="mb-2">
+                    <span class="badge bg-secondary">{{ car.year }} год</span>
+                    {% if car.available %}
+                        <span class="badge bg-success">Активно</span>
+                    {% else %}
+                        <span class="badge bg-danger">Продано</span>
+                    {% endif %}
+                </div>
+                
+                <h5 class="card-title">{{ car.brand }} {{ car.model }}</h5>
+                
+                {% if car.description %}
+                    <p class="card-text text-muted small">
+                        {{ car.description|truncatewords:15 }}
+                    </p>
+                {% endif %}
+                
+                <div class="mt-auto">
+                    <div class="mb-3">
+                        <span class="price-badge">{{ car.price|floatformat:0 }} ₽</span>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'core:car_detail' car.id %}" class="btn btn-primary btn-sm">
+                            <i class="bi bi-eye"></i> Просмотр
+                        </a>
+                        <a href="{% url 'core:edit_car' car.id %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i> Редактировать
+                        </a>
+                        <a href="{% url 'core:delete_car' car.id %}" class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash"></i> Удалить
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-inbox display-1 text-muted"></i>
+    <h3 class="mt-4">У вас пока нет объявлений</h3>
+    <p class="text-muted">Добавьте свой первый автомобиль на продажу</p>
+    <a href="{% url 'core:add_car' %}" class="btn btn-success mt-3">
+        <i class="bi bi-plus-circle"></i> Добавить автомобиль
+    </a>
+</div>
+{% endif %}
+{% endblock %}
