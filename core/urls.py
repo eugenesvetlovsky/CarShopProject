@@ -19,4 +19,14 @@ urlpatterns = [
     path('checkout/', views.checkout, name='checkout'),
     path('order/success/<int:order_id>/', views.order_success, name='order_success'),
     path('my-orders/', views.my_orders, name='my_orders'),
+    
+    # Управление объявлениями
+    path('my-listings/', views.my_listings, name='my_listings'),
+    path('car/add/', views.add_car, name='add_car'),
+    path('car/edit/<int:car_id>/', views.edit_car, name='edit_car'),
+    path('car/delete/<int:car_id>/', views.delete_car, name='delete_car'),
+    
+    # Профиль продавца и отзывы
+    path('seller/<int:user_id>/', views.seller_profile, name='seller_profile'),
+    path('seller/<int:seller_id>/review/', views.add_review, name='add_review'),
 ]

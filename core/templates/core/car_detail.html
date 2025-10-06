@@ -85,6 +85,41 @@
             </div>
         </div>
         {% endif %}
+        
+        <!-- Seller Info -->
+        {% if car.seller %}
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-person-circle"></i> Продавец</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">{{ car.seller.username }}</h6>
+                        {% if seller_rating %}
+                            <div class="text-warning">
+                                {% for i in "12345" %}
+                                    {% if forloop.counter <= seller_rating %}
+                                        <i class="bi bi-star-fill"></i>
+                                    {% elif forloop.counter|add:"-0.5" <= seller_rating %}
+                                        <i class="bi bi-star-half"></i>
+                                    {% else %}
+                                        <i class="bi bi-star"></i>
+                                    {% endif %}
+                                {% endfor %}
+                                <span class="ms-1">{{ seller_rating }}</span>
+                            </div>
+                        {% else %}
+                            <small class="text-muted">Новый продавец</small>
+                        {% endif %}
+                    </div>
+                    <a href="{% url 'core:seller_profile' car.seller.id %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-eye"></i> Профиль
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Action Buttons -->
         <div class="d-grid gap-2">

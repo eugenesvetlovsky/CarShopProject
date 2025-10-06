@@ -6,8 +6,9 @@ from django.http import JsonResponse
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
-from .models import Car, Favorite, Cart, Order
-from .forms import RegisterForm, LoginForm
+from django.contrib.auth.models import User
+from .models import Car, Favorite, Cart, Order, Review, UserProfile
+from .forms import RegisterForm, LoginForm, CarForm, ReviewForm
 
 
 def car_list(request):
@@ -73,9 +74,18 @@ def car_detail(request, car_id):
     if request.user.is_authenticated:
         is_favorite = Favorite.objects.filter(user=request.user, car=car).exists()
     
+    # Получаем информацию о продавце
+    seller_profile = None
+    seller_rating = None
+    if car.seller:
+        seller_profile, created = UserProfile.objects.get_or_create(user=car.seller)
+        seller_rating = seller_profile.get_average_rating()
+    
     return render(request, 'core/car_detail.html', {
         'car': car,
-        'is_favorite': is_favorite
+        'is_favorite': is_favorite,
+        'seller_profile': seller_profile,
+        'seller_rating': seller_rating,
     })
 
 
@@ -295,3 +305,141 @@ def order_success(request, order_id):
 def my_orders(request):
     orders = Order.objects.filter(user=request.user).select_related('car').order_by('-created_at')
     return render(request, 'core/my_orders.html', {'orders': orders})
+
+
+# Управление объявлениями пользователя
+@login_required
+def my_listings(request):
+    """Мои объявления о продаже автомобилей"""
+    listings = Car.objects.filter(seller=request.user).order_by('-created_at')
+    return render(request, 'core/my_listings.html', {'listings': listings})
+
+
+@login_required
+def add_car(request):
+    """Добавить автомобиль на продажу"""
+    if request.method == 'POST':
+        form = CarForm(request.POST, request.FILES)
+        if form.is_valid():
+            car = form.save(commit=False)
+            car.seller = request.user
+            car.available = True
+            car.save()
+            messages.success(request, 'Автомобиль успешно добавлен на продажу!')
+            return redirect('core:my_listings')
+    else:
+        form = CarForm()
+    
+    return render(request, 'core/add_car.html', {'form': form})
+
+
+@login_required
+def edit_car(request, car_id):
+    """Редактировать объявление"""
+    car = get_object_or_404(Car, id=car_id, seller=request.user)
+    
+    if request.method == 'POST':
+        form = CarForm(request.POST, request.FILES, instance=car)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Объявление успешно обновлено!')
+            return redirect('core:my_listings')
+    else:
+        form = CarForm(instance=car)
+    
+    return render(request, 'core/edit_car.html', {'form': form, 'car': car})
+
+
+@login_required
+def delete_car(request, car_id):
+    """Удалить объявление"""
+    car = get_object_or_404(Car, id=car_id, seller=request.user)
+    
+    if request.method == 'POST':
+        car.delete()
+        messages.success(request, 'Объявление успешно удалено!')
+        return redirect('core:my_listings')
+    
+    return render(request, 'core/delete_car_confirm.html', {'car': car})
+
+
+# Профиль продавца и отзывы
+def seller_profile(request, user_id):
+    """Профиль продавца"""
+    seller = get_object_or_404(User, id=user_id)
+    
+    # Создаем профиль если его нет
+    profile, created = UserProfile.objects.get_or_create(user=seller)
+    
+    # Получаем статистику
+    cars_for_sale = Car.objects.filter(seller=seller, available=True)
+    reviews = Review.objects.filter(seller=seller).select_related('buyer')
+    
+    # Проверяем, может ли текущий пользователь оставить отзыв
+    can_review = False
+    if request.user.is_authenticated and request.user != seller:
+        # Пользователь может оставить отзыв, если купил хотя бы один автомобиль у этого продавца
+        has_purchased = Order.objects.filter(
+            user=request.user,
+            car__seller=seller,
+            status='completed'
+        ).exists()
+        
+        # И еще не оставлял отзыв
+        has_reviewed = Review.objects.filter(seller=seller, buyer=request.user).exists()
+        
+        can_review = has_purchased and not has_reviewed
+    
+    context = {
+        'seller': seller,
+        'profile': profile,
+        'cars_for_sale': cars_for_sale,
+        'reviews': reviews,
+        'can_review': can_review,
+        'average_rating': profile.get_average_rating(),
+        'reviews_count': profile.get_reviews_count(),
+        'sales_count': profile.get_sales_count(),
+    }
+    
+    return render(request, 'core/seller_profile.html', context)
+
+
+@login_required
+def add_review(request, seller_id):
+    """Добавить отзыв продавцу"""
+    seller = get_object_or_404(User, id=seller_id)
+    
+    # Проверки
+    if request.user == seller:
+        messages.error(request, 'Вы не можете оставить отзыв самому себе')
+        return redirect('core:seller_profile', user_id=seller_id)
+    
+    # Проверяем, покупал ли пользователь у этого продавца
+    has_purchased = Order.objects.filter(
+        user=request.user,
+        car__seller=seller,
+        status='completed'
+    ).exists()
+    
+    if not has_purchased:
+        messages.error(request, 'Вы можете оставить отзыв только после покупки автомобиля у этого продавца')
+        return redirect('core:seller_profile', user_id=seller_id)
+    
+    # Проверяем, не оставлял ли уже отзыв
+    if Review.objects.filter(seller=seller, buyer=request.user).exists():
+        messages.error(request, 'Вы уже оставили отзыв этому продавцу')
+        return redirect('core:seller_profile', user_id=seller_id)
+    
+    if request.method == 'POST':
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            review = form.save(commit=False)
+            review.seller = seller
+            review.buyer = request.user
+            review.save()
+            messages.success(request, 'Спасибо за ваш отзыв!')
+            return redirect('core:seller_profile', user_id=seller_id)
+    else:
+        form = ReviewForm()
+    
+    return render(request, 'core/add_review.html', {'form': form, 'seller': seller})
