@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Car, Order, Favorite, Cart, Review, UserProfile
+from .models import Car, Order, Favorite, Cart, Review, UserProfile, Chat, Message
 
 @admin.register(Car)
 class CarAdmin(admin.ModelAdmin):
@@ -40,4 +40,20 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display = ('user', 'get_average_rating', 'get_reviews_count', 'get_sales_count')
     search_fields = ('user__username',)
 
+@admin.register(Chat)
+class ChatAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user1', 'user2', 'car', 'created_at', 'updated_at')
+    list_filter = ('created_at', 'updated_at')
+    search_fields = ('user1__username', 'user2__username', 'car__brand', 'car__model')
+    readonly_fields = ('created_at', 'updated_at')
 
+@admin.register(Message)
+class MessageAdmin(admin.ModelAdmin):
+    list_display = ('id', 'chat', 'sender', 'text_preview', 'is_read', 'created_at')
+    list_filter = ('is_read', 'created_at')
+    search_fields = ('sender__username', 'text')
+    readonly_fields = ('created_at',)
+    
+    def text_preview(self, obj):
+        return obj.text[:50] + '...' if len(obj.text) > 50 else obj.text
+    text_preview.short_description = 'Текст сообщения'

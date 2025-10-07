@@ -36,4 +36,9 @@ urlpatterns = [
     path('profile/', views.my_profile, name='my_profile'),
     path('profile/edit/', views.edit_profile, name='edit_profile'),
     path('profile/change-password/', views.change_password, name='change_password'),
+    
+    # Чаты и сообщения
+    path('chats/', views.chats_list, name='chats_list'),
+    path('chat/<int:chat_id>/', views.chat_detail, name='chat_detail'),
+    path('chat/start/<int:seller_id>/<int:car_id>/', views.start_chat, name='start_chat'),
 ]

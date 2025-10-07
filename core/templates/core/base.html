@@ -51,11 +51,27 @@
             font-weight: 500;
             transition: all 0.3s;
             padding: 0.5rem 1rem !important;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 0.25rem;
+        }
+        
+        .nav-link i {
+            font-size: 1.5rem;
         }
         
         .nav-link:hover {
             color: white !important;
             transform: translateY(-2px);
+        }
+        
+        .badge-notification {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 0.7rem;
         }
         
         /* Hero Section */
@@ -209,61 +225,83 @@
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'core:car_list' %}">
-                            <i class="bi bi-grid-3x3-gap"></i> Каталог
+                            <i class="bi bi-grid-3x3-gap"></i>
+                            <span>Каталог</span>
                         </a>
                     </li>
                     {% if user.is_authenticated %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'core:favorites' %}">
-                            <i class="bi bi-heart-fill"></i> Избранное
+                            <i class="bi bi-heart-fill"></i>
+                            <span>Избранное</span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'core:cart' %}">
-                            <i class="bi bi-cart-fill"></i> Корзина
+                            <i class="bi bi-cart-fill"></i>
+                            <span>Корзина</span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'core:my_orders' %}">
-                            <i class="bi bi-list-ul"></i> Мои заказы
+                            <i class="bi bi-list-ul"></i>
+                            <span>Мои заказы</span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'core:my_listings' %}">
-                            <i class="bi bi-card-list"></i> Мои объявления
+                            <i class="bi bi-card-list"></i>
+                            <span>Мои объявления</span>
+                        </a>
+                    </li>
+                    <li class="nav-item position-relative">
+                        <a class="nav-link" href="{% url 'core:chats_list' %}">
+                            <i class="bi bi-chat-dots"></i>
+                            <span>Чаты</span>
+                            {% if total_unread_messages > 0 %}
+                                <span class="badge bg-danger rounded-pill position-absolute top-0 start-100 translate-middle">
+                                    {{ total_unread_messages }}
+                                </span>
+                            {% endif %}
                         </a>
                     </li>
                     {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="#">
-                            <i class="bi bi-info-circle"></i> О нас
+                            <i class="bi bi-info-circle"></i>
+                            <span>О нас</span>
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#">
-                            <i class="bi bi-telephone"></i> Контакты
+                            <i class="bi bi-telephone"></i>
+                            <span>Контакты</span>
                         </a>
                     </li>
                     {% if user.is_authenticated %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'core:my_profile' %}">
-                            <i class="bi bi-person-circle"></i> {{ user.username }}
+                            <i class="bi bi-person-circle"></i>
+                            <span>{{ user.username }}</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link btn btn-outline-light btn-sm" href="{% url 'core:logout' %}">
-                            <i class="bi bi-box-arrow-right"></i> Выйти
+                        <a class="nav-link" href="{% url 'core:logout' %}">
+                            <i class="bi bi-box-arrow-right"></i>
+                            <span>Выйти</span>
                         </a>
                     </li>
                     {% else %}
                     <li class="nav-item">
-                        <a class="nav-link btn btn-outline-light btn-sm me-2" href="{% url 'core:login' %}">
-                            <i class="bi bi-box-arrow-in-right"></i> Войти
+                        <a class="nav-link" href="{% url 'core:login' %}">
+                            <i class="bi bi-box-arrow-in-right"></i>
+                            <span>Войти</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link btn btn-light btn-sm" href="{% url 'core:register' %}">
-                            <i class="bi bi-person-plus"></i> Регистрация
+                        <a class="nav-link" href="{% url 'core:register' %}">
+                            <i class="bi bi-person-plus"></i>
+                            <span>Регистрация</span>
                         </a>
                     </li>
                     {% endif %}

@@ -1,0 +1,151 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Чат с {{ other_user.username }} - CarShop{% endblock %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+                <a href="{% url 'core:chats_list' %}" class="btn btn-outline-light me-3">
+                    <i class="bi bi-arrow-left"></i>
+                </a>
+                <div>
+                    <h1 class="mb-0"><i class="bi bi-person-circle"></i> {{ other_user.username }}</h1>
+                    {% if chat.car %}
+                        <p class="mb-0 text-white-50">
+                            <i class="bi bi-car-front"></i> {{ chat.car.brand }} {{ chat.car.model }} ({{ chat.car.year }})
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+            {% if chat.car %}
+                <a href="{% url 'core:car_detail' chat.car.id %}" class="btn btn-light">
+                    <i class="bi bi-eye"></i> Посмотреть авто
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <!-- Область сообщений -->
+                <div class="chat-messages p-4" id="chatMessages" style="height: 500px; overflow-y: auto;">
+                    {% if messages_list %}
+                        {% for message in messages_list %}
+                        <div class="message-item mb-3 {% if message.sender == request.user %}text-end{% endif %}">
+                            <div class="d-inline-block" style="max-width: 70%;">
+                                <div class="message-bubble p-3 rounded {% if message.sender == request.user %}bg-primary text-white{% else %}{% if not message.is_read and message.sender != request.user %}bg-warning bg-opacity-25 border border-warning unread-message{% else %}bg-light{% endif %}{% endif %}">
+                                    {% if not message.is_read and message.sender != request.user %}
+                                        <span class="badge bg-warning text-dark mb-2">
+                                            <i class="bi bi-envelope-fill"></i> Новое
+                                        </span>
+                                    {% endif %}
+                                    <p class="mb-1">{{ message.text }}</p>
+                                    <small class="{% if message.sender == request.user %}text-white-50{% else %}text-muted{% endif %}">
+                                        {{ message.created_at|date:"H:i" }}
+                                        {% if message.sender == request.user %}
+                                            {% if message.is_read %}
+                                                <i class="bi bi-check-all text-white-50" title="Прочитано"></i>
+                                            {% else %}
+                                                <i class="bi bi-check text-white-50" title="Отправлено"></i>
+                                            {% endif %}
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <small class="d-block mt-1 {% if message.sender == request.user %}text-end{% endif %} text-muted">
+                                    {% if message.sender == request.user %}
+                                        Вы
+                                    {% else %}
+                                        {{ message.sender.username }}
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-chat-dots fs-1 d-block mb-3"></i>
+                            <p>Начните общение, отправив первое сообщение</p>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Форма отправки сообщения -->
+                <div class="border-top p-3">
+                    <form method="post" id="messageForm">
+                        {% csrf_token %}
+                        <div class="input-group">
+                            <textarea 
+                                name="message_text" 
+                                class="form-control" 
+                                placeholder="Введите сообщение..." 
+                                rows="2"
+                                required
+                                id="messageInput"
+                            ></textarea>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-send"></i> Отправить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .message-bubble {
+        word-wrap: break-word;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    .chat-messages {
+        background-color: #f8f9fa;
+    }
+    
+    #messageInput {
+        resize: none;
+    }
+    
+    .unread-message {
+        animation: highlight 2s ease-in-out;
+    }
+    
+    @keyframes highlight {
+        0% {
+            background-color: #fff3cd;
+        }
+        50% {
+            background-color: #fffaeb;
+        }
+        100% {
+            background-color: rgba(255, 193, 7, 0.25);
+        }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Прокручиваем к последнему сообщению
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // Фокус на поле ввода
+    document.getElementById('messageInput').focus();
+    
+    // Отправка по Ctrl+Enter
+    document.getElementById('messageInput').addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+            document.getElementById('messageForm').submit();
+        }
+    });
+});
+</script>
+{% endblock %}

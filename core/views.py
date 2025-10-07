@@ -7,7 +7,8 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.contrib.auth.models import User
-from .models import Car, Favorite, Cart, Order, Review, UserProfile
+from django.db.models import Q, Max
+from .models import Car, Favorite, Cart, Order, Review, UserProfile, Chat, Message
 from .forms import RegisterForm, LoginForm, CarForm, ReviewForm, UserUpdateForm, PasswordChangeCustomForm
 
 
@@ -534,3 +535,104 @@ def change_password(request):
         form = PasswordChangeCustomForm()
     
     return render(request, 'core/change_password.html', {'form': form})
+
+
+# Система сообщений
+@login_required
+def chats_list(request):
+    """Список всех чатов пользователя"""
+    # Получаем все чаты где пользователь участвует
+    chats = Chat.objects.filter(
+        Q(user1=request.user) | Q(user2=request.user)
+    ).select_related('user1', 'user2', 'car').prefetch_related('messages')
+    
+    # Подготавливаем данные для отображения
+    chats_data = []
+    total_unread = 0
+    
+    for chat in chats:
+        other_user = chat.get_other_user(request.user)
+        last_message = chat.get_last_message()
+        unread_count = chat.get_unread_count(request.user)
+        total_unread += unread_count
+        
+        chats_data.append({
+            'chat': chat,
+            'other_user': other_user,
+            'last_message': last_message,
+            'unread_count': unread_count,
+        })
+    
+    context = {
+        'chats_data': chats_data,
+        'total_unread': total_unread,
+    }
+    
+    return render(request, 'core/chats_list.html', context)
+
+
+@login_required
+def chat_detail(request, chat_id):
+    """Детальный просмотр чата и отправка сообщений"""
+    chat = get_object_or_404(Chat, id=chat_id)
+    
+    # Проверяем, что пользователь участвует в этом чате
+    if request.user not in [chat.user1, chat.user2]:
+        messages.error(request, 'У вас нет доступа к этому чату')
+        return redirect('core:chats_list')
+    
+    # Отмечаем все сообщения как прочитанные
+    Message.objects.filter(chat=chat, is_read=False).exclude(sender=request.user).update(is_read=True)
+    
+    # Обработка отправки сообщения
+    if request.method == 'POST':
+        text = request.POST.get('message_text', '').strip()
+        if text:
+            Message.objects.create(
+                chat=chat,
+                sender=request.user,
+                text=text
+            )
+            # Обновляем время последнего обновления чата
+            chat.save()
+            return redirect('core:chat_detail', chat_id=chat.id)
+    
+    # Получаем все сообщения (в обратном порядке для отображения)
+    messages_list = chat.messages.select_related('sender').order_by('created_at')
+    
+    other_user = chat.get_other_user(request.user)
+    
+    context = {
+        'chat': chat,
+        'messages_list': messages_list,
+        'other_user': other_user,
+    }
+    
+    return render(request, 'core/chat_detail.html', context)
+
+
+@login_required
+def start_chat(request, seller_id, car_id):
+    """Начать чат с продавцом по конкретному автомобилю"""
+    seller = get_object_or_404(User, id=seller_id)
+    car = get_object_or_404(Car, id=car_id)
+    
+    # Нельзя начать чат с самим собой
+    if request.user == seller:
+        messages.error(request, 'Вы не можете начать чат с самим собой')
+        return redirect('core:car_detail', car_id=car.id)
+    
+    # Проверяем, существует ли уже чат
+    # Нормализуем порядок пользователей (меньший ID всегда user1)
+    user1, user2 = (request.user, seller) if request.user.id < seller.id else (seller, request.user)
+    
+    chat, created = Chat.objects.get_or_create(
+        user1=user1,
+        user2=user2,
+        car=car
+    )
+    
+    if created:
+        messages.success(request, f'Чат с {seller.username} создан')
+    
+    return redirect('core:chat_detail', chat_id=chat.id)

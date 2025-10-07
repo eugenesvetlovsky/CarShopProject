@@ -99,3 +99,50 @@ class UserProfile(models.Model):
     
     def __str__(self):
         return f"Профиль {self.user.username}"
+
+
+class Chat(models.Model):
+    """Чат между двумя пользователями"""
+    user1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chats_as_user1', verbose_name='Пользователь 1')
+    user2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chats_as_user2', verbose_name='Пользователь 2')
+    car = models.ForeignKey(Car, on_delete=models.SET_NULL, null=True, blank=True, related_name='chats', verbose_name='Автомобиль')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Последнее обновление')
+    
+    class Meta:
+        verbose_name = 'Чат'
+        verbose_name_plural = 'Чаты'
+        ordering = ['-updated_at']
+        unique_together = ('user1', 'user2', 'car')
+    
+    def __str__(self):
+        return f"Чат: {self.user1.username} - {self.user2.username}"
+    
+    def get_other_user(self, current_user):
+        """Получить собеседника"""
+        return self.user2 if self.user1 == current_user else self.user1
+    
+    def get_last_message(self):
+        """Получить последнее сообщение"""
+        return self.messages.first()
+    
+    def get_unread_count(self, user):
+        """Получить количество непрочитанных сообщений для пользователя"""
+        return self.messages.filter(is_read=False).exclude(sender=user).count()
+
+
+class Message(models.Model):
+    """Сообщение в чате"""
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name='messages', verbose_name='Чат')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages', verbose_name='Отправитель')
+    text = models.TextField(verbose_name='Текст сообщения')
+    is_read = models.BooleanField(default=False, verbose_name='Прочитано')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата отправки')
+    
+    class Meta:
+        verbose_name = 'Сообщение'
+        verbose_name_plural = 'Сообщения'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.sender.username}: {self.text[:50]}"

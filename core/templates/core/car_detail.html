@@ -139,14 +139,16 @@
                     <a href="{% url 'core:add_to_cart' car.id %}" class="btn btn-success btn-lg">
                         <i class="bi bi-cart-plus"></i> Добавить в корзину
                     </a>
+                    {% if car.seller and user != car.seller %}
+                        <a href="{% url 'core:start_chat' car.seller.id car.id %}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-chat-dots"></i> Написать продавцу
+                        </a>
+                    {% endif %}
                 {% else %}
                     <a href="{% url 'core:login' %}" class="btn btn-success btn-lg">
                         <i class="bi bi-cart-plus"></i> Войдите, чтобы купить
                     </a>
                 {% endif %}
-                <button class="btn btn-outline-secondary btn-lg" type="button">
-                    <i class="bi bi-telephone"></i> Связаться с менеджером
-                </button>
             {% else %}
                 <button class="btn btn-secondary btn-lg" type="button" disabled>
                     <i class="bi bi-x-circle"></i> Автомобиль продан
