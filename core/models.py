@@ -68,15 +68,17 @@ class Favorite(models.Model):
 class Review(models.Model):
     seller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_reviews', verbose_name='Продавец')
     buyer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='given_reviews', verbose_name='Покупатель')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='review', verbose_name='Заказ', null=True, blank=True)
     rating = models.IntegerField(choices=[(i, f'{i} звезд' if i > 1 else f'{i} звезда') for i in range(1, 6)], verbose_name='Рейтинг')
     comment = models.TextField(verbose_name='Комментарий')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Дата обновления')
 
     class Meta:
         verbose_name = 'Отзыв'
         verbose_name_plural = 'Отзывы'
         ordering = ['-created_at']
-        unique_together = ('seller', 'buyer')  # Один покупатель может оставить только один отзыв продавцу
+        # Убрали unique_together - теперь можно оставлять несколько отзывов
 
     def __str__(self):
         return f"Отзыв от {self.buyer.username} для {self.seller.username} - {self.rating} звезд"

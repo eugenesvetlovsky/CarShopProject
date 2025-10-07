@@ -28,7 +28,9 @@ urlpatterns = [
     
     # Профиль продавца и отзывы
     path('seller/<int:user_id>/', views.seller_profile, name='seller_profile'),
-    path('seller/<int:seller_id>/review/', views.add_review, name='add_review'),
+    path('seller/<int:seller_id>/review/<int:order_id>/', views.add_review, name='add_review'),
+    path('review/edit/<int:review_id>/', views.edit_review, name='edit_review'),
+    path('review/delete/<int:review_id>/', views.delete_review, name='delete_review'),
     
     # Личный профиль пользователя
     path('profile/', views.my_profile, name='my_profile'),

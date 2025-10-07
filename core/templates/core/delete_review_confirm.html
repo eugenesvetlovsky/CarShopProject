@@ -1,0 +1,63 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Удалить отзыв - CarShop{% endblock %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h1><i class="bi bi-trash"></i> Удалить отзыв</h1>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>
+                    <h5>Вы уверены, что хотите удалить этот отзыв?</h5>
+                </div>
+                
+                <div class="mb-4">
+                    <h6>Продавец: <strong>{{ review.seller.username }}</strong></h6>
+                    {% if review.order %}
+                        <p class="text-muted mb-2">
+                            <i class="bi bi-car-front"></i> {{ review.order.car.brand }} {{ review.order.car.model }}
+                        </p>
+                    {% endif %}
+                    
+                    <div class="text-warning mb-2">
+                        {% for i in "12345" %}
+                            {% if forloop.counter <= review.rating %}
+                                <i class="bi bi-star-fill"></i>
+                            {% else %}
+                                <i class="bi bi-star"></i>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <p class="mb-0">{{ review.comment }}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger btn-lg">
+                            <i class="bi bi-trash"></i> Да, удалить отзыв
+                        </button>
+                        <a href="{% url 'core:seller_profile' review.seller.id %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

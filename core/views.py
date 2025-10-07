@@ -373,29 +373,30 @@ def seller_profile(request, user_id):
     
     # Получаем статистику
     cars_for_sale = Car.objects.filter(seller=seller, available=True)
-    reviews = Review.objects.filter(seller=seller).select_related('buyer')
+    reviews = Review.objects.filter(seller=seller).select_related('buyer', 'order__car')
     
     # Проверяем, может ли текущий пользователь оставить отзыв
-    can_review = False
+    # Получаем заказы без отзывов
+    orders_without_review = []
     if request.user.is_authenticated and request.user != seller:
-        # Пользователь может оставить отзыв, если купил хотя бы один автомобиль у этого продавца
-        has_purchased = Order.objects.filter(
+        # Получаем все завершенные заказы у этого продавца
+        completed_orders = Order.objects.filter(
             user=request.user,
             car__seller=seller,
             status='completed'
-        ).exists()
+        ).select_related('car')
         
-        # И еще не оставлял отзыв
-        has_reviewed = Review.objects.filter(seller=seller, buyer=request.user).exists()
-        
-        can_review = has_purchased and not has_reviewed
+        # Фильтруем заказы, у которых еще нет отзыва
+        for order in completed_orders:
+            if not Review.objects.filter(order=order).exists():
+                orders_without_review.append(order)
     
     context = {
         'seller': seller,
         'profile': profile,
         'cars_for_sale': cars_for_sale,
         'reviews': reviews,
-        'can_review': can_review,
+        'orders_without_review': orders_without_review,
         'average_rating': profile.get_average_rating(),
         'reviews_count': profile.get_reviews_count(),
         'sales_count': profile.get_sales_count(),
@@ -405,29 +406,19 @@ def seller_profile(request, user_id):
 
 
 @login_required
-def add_review(request, seller_id):
-    """Добавить отзыв продавцу"""
+def add_review(request, seller_id, order_id):
+    """Добавить отзыв продавцу по конкретному заказу"""
     seller = get_object_or_404(User, id=seller_id)
+    order = get_object_or_404(Order, id=order_id, user=request.user, car__seller=seller, status='completed')
     
     # Проверки
     if request.user == seller:
         messages.error(request, 'Вы не можете оставить отзыв самому себе')
         return redirect('core:seller_profile', user_id=seller_id)
     
-    # Проверяем, покупал ли пользователь у этого продавца
-    has_purchased = Order.objects.filter(
-        user=request.user,
-        car__seller=seller,
-        status='completed'
-    ).exists()
-    
-    if not has_purchased:
-        messages.error(request, 'Вы можете оставить отзыв только после покупки автомобиля у этого продавца')
-        return redirect('core:seller_profile', user_id=seller_id)
-    
-    # Проверяем, не оставлял ли уже отзыв
-    if Review.objects.filter(seller=seller, buyer=request.user).exists():
-        messages.error(request, 'Вы уже оставили отзыв этому продавцу')
+    # Проверяем, не оставлен ли уже отзыв к этому заказу
+    if Review.objects.filter(order=order).exists():
+        messages.error(request, 'Вы уже оставили отзыв к этому заказу')
         return redirect('core:seller_profile', user_id=seller_id)
     
     if request.method == 'POST':
@@ -436,13 +427,45 @@ def add_review(request, seller_id):
             review = form.save(commit=False)
             review.seller = seller
             review.buyer = request.user
+            review.order = order
             review.save()
             messages.success(request, 'Спасибо за ваш отзыв!')
             return redirect('core:seller_profile', user_id=seller_id)
     else:
         form = ReviewForm()
     
-    return render(request, 'core/add_review.html', {'form': form, 'seller': seller})
+    return render(request, 'core/add_review.html', {'form': form, 'seller': seller, 'order': order})
+
+
+@login_required
+def edit_review(request, review_id):
+    """Редактировать свой отзыв"""
+    review = get_object_or_404(Review, id=review_id, buyer=request.user)
+    
+    if request.method == 'POST':
+        form = ReviewForm(request.POST, instance=review)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Отзыв успешно обновлен!')
+            return redirect('core:seller_profile', user_id=review.seller.id)
+    else:
+        form = ReviewForm(instance=review)
+    
+    return render(request, 'core/edit_review.html', {'form': form, 'review': review})
+
+
+@login_required
+def delete_review(request, review_id):
+    """Удалить свой отзыв"""
+    review = get_object_or_404(Review, id=review_id, buyer=request.user)
+    seller_id = review.seller.id
+    
+    if request.method == 'POST':
+        review.delete()
+        messages.success(request, 'Отзыв успешно удален!')
+        return redirect('core:seller_profile', user_id=seller_id)
+    
+    return render(request, 'core/delete_review_confirm.html', {'review': review})
 
 
 # Профиль пользователя
