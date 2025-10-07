@@ -3,103 +3,38 @@ from django.contrib.auth import login, logout, authenticate, update_session_auth
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
-from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Q, Max
 from .models import Car, Favorite, Cart, Order, Review, UserProfile, Chat, Message
 from .forms import RegisterForm, LoginForm, CarForm, ReviewForm, UserUpdateForm, PasswordChangeCustomForm
+from .services import (
+    CarService, FavoriteService, CartService, OrderService,
+    ReviewService, ChatService, ProfileService, AuthService
+)
 
 
 def car_list(request):
-    cars = Car.objects.filter(available=True)
-    
-    # Фильтрация по цене
-    price_min = request.GET.get('price_min')
-    price_max = request.GET.get('price_max')
-    
-    if price_min:
-        cars = cars.filter(price__gte=price_min)
-    if price_max:
-        cars = cars.filter(price__lte=price_max)
-    
-    # Фильтрация по году
-    year_min = request.GET.get('year_min')
-    year_max = request.GET.get('year_max')
-    
-    if year_min:
-        cars = cars.filter(year__gte=year_min)
-    if year_max:
-        cars = cars.filter(year__lte=year_max)
-    
-    # Фильтрация по марке
-    brand = request.GET.get('brand')
-    if brand:
-        cars = cars.filter(brand__icontains=brand)
-    
-    # Сортировка
-    sort_by = request.GET.get('sort', '-created_at')
-    cars = cars.order_by(sort_by)
-    
-    # Получаем список ID избранных автомобилей для текущего пользователя
-    favorite_ids = []
-    if request.user.is_authenticated:
-        favorite_ids = Favorite.objects.filter(user=request.user).values_list('car_id', flat=True)
-    
-    # Получаем уникальные марки для фильтра (только доступные автомобили)
-    brands = Car.objects.filter(available=True).values_list('brand', flat=True).distinct().order_by('brand')
-    
-    context = {
-        'cars': cars,
-        'favorite_ids': list(favorite_ids),
-        'brands': brands,
-        'filters': {
-            'price_min': price_min or '',
-            'price_max': price_max or '',
-            'year_min': year_min or '',
-            'year_max': year_max or '',
-            'brand': brand or '',
-            'sort': sort_by,
-        }
-    }
-    
+    """Список автомобилей с фильтрацией"""
+    context = CarService.get_car_list_context(request)
     return render(request, 'core/car_list.html', context)
 
 
 def car_detail(request, car_id):
-    car = get_object_or_404(Car, id=car_id)
-    
-    # Проверяем, добавлен ли автомобиль в избранное
-    is_favorite = False
-    if request.user.is_authenticated:
-        is_favorite = Favorite.objects.filter(user=request.user, car=car).exists()
-    
-    # Получаем информацию о продавце
-    seller_profile = None
-    seller_rating = None
-    if car.seller:
-        seller_profile, created = UserProfile.objects.get_or_create(user=car.seller)
-        seller_rating = seller_profile.get_average_rating()
-    
-    return render(request, 'core/car_detail.html', {
-        'car': car,
-        'is_favorite': is_favorite,
-        'seller_profile': seller_profile,
-        'seller_rating': seller_rating,
-    })
+    """Детальная информация об автомобиле"""
+    context = CarService.get_car_detail_context(request, car_id)
+    return render(request, 'core/car_detail.html', context)
 
 
 def register_view(request):
+    """Регистрация пользователя"""
     if request.user.is_authenticated:
         return redirect('core:car_list')
     
     if request.method == 'POST':
         form = RegisterForm(request.POST)
-        if form.is_valid():
-            user = form.save()
+        success, user, message = AuthService.process_registration(request, form)
+        if success:
             login(request, user)
-            messages.success(request, 'Регистрация прошла успешно! Добро пожаловать!')
+            messages.success(request, message)
             return redirect('core:car_list')
     else:
         form = RegisterForm()
@@ -108,19 +43,17 @@ def register_view(request):
 
 
 def login_view(request):
+    """Вход в систему"""
     if request.user.is_authenticated:
         return redirect('core:car_list')
     
     if request.method == 'POST':
         form = LoginForm(request, data=request.POST)
-        if form.is_valid():
-            username = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password')
-            user = authenticate(username=username, password=password)
-            if user is not None:
-                login(request, user)
-                messages.success(request, f'Добро пожаловать, {username}!')
-                return redirect('core:car_list')
+        success, user, message = AuthService.process_login(request, form)
+        if success:
+            login(request, user)
+            messages.success(request, message)
+            return redirect('core:car_list')
     else:
         form = LoginForm()
     
@@ -135,22 +68,11 @@ def logout_view(request):
 
 @login_required
 def toggle_favorite(request, car_id):
-    car = get_object_or_404(Car, id=car_id)
-    favorite, created = Favorite.objects.get_or_create(user=request.user, car=car)
-    
-    if not created:
-        favorite.delete()
-        is_favorite = False
-        message = 'Удалено из избранного'
-    else:
-        is_favorite = True
-        message = 'Добавлено в избранное'
+    """Добавить/удалить из избранного"""
+    is_favorite, message = FavoriteService.process_toggle_favorite(request, car_id)
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({
-            'is_favorite': is_favorite,
-            'message': message
-        })
+        return JsonResponse({'is_favorite': is_favorite, 'message': message})
     
     messages.success(request, message)
     return redirect(request.META.get('HTTP_REFERER', 'core:car_list'))
@@ -158,162 +80,77 @@ def toggle_favorite(request, car_id):
 
 @login_required
 def favorites_view(request):
-    favorites = Favorite.objects.filter(user=request.user).select_related('car')
-    return render(request, 'core/favorites.html', {'favorites': favorites})
+    """Избранное"""
+    context = FavoriteService.get_favorites_context(request)
+    return render(request, 'core/favorites.html', context)
 
 
 @login_required
 def add_to_cart(request, car_id):
-    car = get_object_or_404(Car, id=car_id)
+    """Добавить автомобиль в корзину"""
+    success, message = CartService.process_add_to_cart(request, car_id)
     
-    # Проверяем доступность автомобиля
-    if not car.available:
-        messages.error(request, 'Этот автомобиль уже недоступен для покупки')
-        return redirect(request.META.get('HTTP_REFERER', 'core:car_list'))
-    
-    # Добавляем в корзину или сообщаем, что уже есть
-    cart_item, created = Cart.objects.get_or_create(user=request.user, car=car)
-    
-    if created:
-        messages.success(request, f'{car.brand} {car.model} добавлен в корзину')
+    if success:
+        messages.success(request, message)
     else:
-        messages.info(request, 'Этот автомобиль уже в вашей корзине')
+        messages.info(request, message)
     
     return redirect(request.META.get('HTTP_REFERER', 'core:car_list'))
 
 
 @login_required
 def cart_view(request):
-    cart_items = Cart.objects.filter(user=request.user).select_related('car')
-    
-    # Вычисляем общую стоимость
-    total_price = sum(item.car.price for item in cart_items)
-    
-    context = {
-        'cart_items': cart_items,
-        'total_price': total_price,
-    }
-    
+    """Просмотр корзины"""
+    context = CartService.get_cart_context(request)
     return render(request, 'core/cart.html', context)
 
 
 @login_required
 def remove_from_cart(request, car_id):
-    cart_item = get_object_or_404(Cart, user=request.user, car_id=car_id)
-    car_name = f"{cart_item.car.brand} {cart_item.car.model}"
-    cart_item.delete()
-    
-    messages.success(request, f'{car_name} удалён из корзины')
+    """Удалить из корзины"""
+    message = CartService.remove_from_cart(request.user, car_id)
+    messages.success(request, message)
     return redirect('core:cart')
 
 
 @login_required
 def checkout(request):
-    cart_items = Cart.objects.filter(user=request.user).select_related('car')
-    
-    if not cart_items.exists():
-        messages.warning(request, 'Ваша корзина пуста')
-        return redirect('core:cart')
-    
-    # Создаём заказы для каждого автомобиля в корзине
-    orders = []
-    cars_info = []
-    
-    for cart_item in cart_items:
-        car = cart_item.car
-        
-        # Проверяем доступность
-        if not car.available:
-            messages.error(request, f'{car.brand} {car.model} больше недоступен')
-            continue
-        
-        # Создаём заказ
-        order = Order.objects.create(
-            user=request.user,
-            car=car,
-            status='completed'
-        )
-        orders.append(order)
-        
-        # Делаем автомобиль недоступным
-        car.available = False
-        car.save()
-        
-        # Сохраняем информацию для письма
-        cars_info.append({
-            'brand': car.brand,
-            'model': car.model,
-            'year': car.year,
-            'price': car.price,
-        })
-        
-        # Удаляем из корзины
-        cart_item.delete()
+    """Оформление заказа"""
+    orders, result = OrderService.create_orders_from_cart(request.user)
     
     if not orders:
-        messages.error(request, 'Не удалось оформить заказ')
+        messages.warning(request, result)
         return redirect('core:cart')
     
-    # Отправляем email
-    try:
-        subject = f'Подтверждение заказа #{orders[0].id} - CarShop'
-        
-        # HTML версия письма
-        html_message = render_to_string('core/email/order_confirmation.html', {
-            'user': request.user,
-            'cars': cars_info,
-            'total_price': sum(car['price'] for car in cars_info),
-            'order_id': orders[0].id,
-        })
-        
-        # Текстовая версия письма
-        plain_message = f"""
-Здравствуйте, {request.user.username}!
-
-Спасибо за ваш заказ в CarShop!
-
-Детали заказа:
-"""
-        for car in cars_info:
-            plain_message += f"\n- {car['brand']} {car['model']} ({car['year']}) - {car['price']} ₽"
-        
-        plain_message += f"\n\nОбщая стоимость: {sum(car['price'] for car in cars_info)} ₽"
-        plain_message += "\n\nС уважением,\nКоманда CarShop"
-        
-        send_mail(
-            subject=subject,
-            message=plain_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[request.user.email],
-            html_message=html_message,
-            fail_silently=False,
-        )
-        
-        messages.success(request, f'Заказ успешно оформлен! Письмо с подтверждением отправлено на {request.user.email}')
-    except Exception as e:
-        messages.warning(request, f'Заказ оформлен, но не удалось отправить email: {str(e)}')
+    success, message = OrderService.send_order_confirmation_email(request.user, orders, result)
+    
+    if success:
+        messages.success(request, message)
+    else:
+        messages.warning(request, message)
     
     return redirect('core:order_success', order_id=orders[0].id)
 
 
 @login_required
 def order_success(request, order_id):
-    order = get_object_or_404(Order, id=order_id, user=request.user)
-    return render(request, 'core/order_success.html', {'order': order})
+    """Успешное оформление заказа"""
+    context = OrderService.get_order_success_context(request, order_id)
+    return render(request, 'core/order_success.html', context)
 
 
 @login_required
 def my_orders(request):
-    orders = Order.objects.filter(user=request.user).select_related('car').order_by('-created_at')
-    return render(request, 'core/my_orders.html', {'orders': orders})
-
+    """Мои заказы"""
+    context = OrderService.get_my_orders_context(request)
+    return render(request, 'core/my_orders.html', context)
 
 # Управление объявлениями пользователя
 @login_required
 def my_listings(request):
     """Мои объявления о продаже автомобилей"""
-    listings = Car.objects.filter(seller=request.user).order_by('-created_at')
-    return render(request, 'core/my_listings.html', {'listings': listings})
+    context = CarService.get_my_listings_context(request)
+    return render(request, 'core/my_listings.html', {'listings': context['cars']})
 
 
 @login_required
@@ -321,12 +158,9 @@ def add_car(request):
     """Добавить автомобиль на продажу"""
     if request.method == 'POST':
         form = CarForm(request.POST, request.FILES)
-        if form.is_valid():
-            car = form.save(commit=False)
-            car.seller = request.user
-            car.available = True
-            car.save()
-            messages.success(request, 'Автомобиль успешно добавлен на продажу!')
+        success, message = CarService.process_add_car(request, form)
+        if success:
+            messages.success(request, message)
             return redirect('core:my_listings')
     else:
         form = CarForm()
@@ -341,9 +175,9 @@ def edit_car(request, car_id):
     
     if request.method == 'POST':
         form = CarForm(request.POST, request.FILES, instance=car)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Объявление успешно обновлено!')
+        success, message = CarService.process_edit_car(request, car, form)
+        if success:
+            messages.success(request, message)
             return redirect('core:my_listings')
     else:
         form = CarForm(instance=car)
@@ -357,8 +191,8 @@ def delete_car(request, car_id):
     car = get_object_or_404(Car, id=car_id, seller=request.user)
     
     if request.method == 'POST':
-        car.delete()
-        messages.success(request, 'Объявление успешно удалено!')
+        message = CarService.process_delete_car(car)
+        messages.success(request, message)
         return redirect('core:my_listings')
     
     return render(request, 'core/delete_car_confirm.html', {'car': car})
@@ -367,75 +201,33 @@ def delete_car(request, car_id):
 # Профиль продавца и отзывы
 def seller_profile(request, user_id):
     """Профиль продавца"""
-    seller = get_object_or_404(User, id=user_id)
-    
-    # Создаем профиль если его нет
-    profile, created = UserProfile.objects.get_or_create(user=seller)
-    
-    # Получаем статистику
-    cars_for_sale = Car.objects.filter(seller=seller, available=True)
-    reviews = Review.objects.filter(seller=seller).select_related('buyer', 'order__car')
-    
-    # Проверяем, может ли текущий пользователь оставить отзыв
-    # Получаем заказы без отзывов
-    orders_without_review = []
-    if request.user.is_authenticated and request.user != seller:
-        # Получаем все завершенные заказы у этого продавца
-        completed_orders = Order.objects.filter(
-            user=request.user,
-            car__seller=seller,
-            status='completed'
-        ).select_related('car')
-        
-        # Фильтруем заказы, у которых еще нет отзыва
-        for order in completed_orders:
-            if not Review.objects.filter(order=order).exists():
-                orders_without_review.append(order)
-    
-    context = {
-        'seller': seller,
-        'profile': profile,
-        'cars_for_sale': cars_for_sale,
-        'reviews': reviews,
-        'orders_without_review': orders_without_review,
-        'average_rating': profile.get_average_rating(),
-        'reviews_count': profile.get_reviews_count(),
-        'sales_count': profile.get_sales_count(),
-    }
-    
+    context = ProfileService.get_seller_profile_context(request, user_id)
     return render(request, 'core/seller_profile.html', context)
 
 
 @login_required
 def add_review(request, seller_id, order_id):
     """Добавить отзыв продавцу по конкретному заказу"""
-    seller = get_object_or_404(User, id=seller_id)
-    order = get_object_or_404(Order, id=order_id, user=request.user, car__seller=seller, status='completed')
+    context = ReviewService.get_add_review_context(request, seller_id, order_id)
+    seller = context['seller']
+    order = context['order']
     
-    # Проверки
-    if request.user == seller:
-        messages.error(request, 'Вы не можете оставить отзыв самому себе')
-        return redirect('core:seller_profile', user_id=seller_id)
-    
-    # Проверяем, не оставлен ли уже отзыв к этому заказу
-    if Review.objects.filter(order=order).exists():
-        messages.error(request, 'Вы уже оставили отзыв к этому заказу')
+    can_review, error_message = ReviewService.can_add_review(request.user, seller, order)
+    if not can_review:
+        messages.error(request, error_message)
         return redirect('core:seller_profile', user_id=seller_id)
     
     if request.method == 'POST':
         form = ReviewForm(request.POST)
-        if form.is_valid():
-            review = form.save(commit=False)
-            review.seller = seller
-            review.buyer = request.user
-            review.order = order
-            review.save()
-            messages.success(request, 'Спасибо за ваш отзыв!')
+        success, message = ReviewService.process_add_review(request, seller, order, form)
+        if success:
+            messages.success(request, message)
             return redirect('core:seller_profile', user_id=seller_id)
     else:
         form = ReviewForm()
     
-    return render(request, 'core/add_review.html', {'form': form, 'seller': seller, 'order': order})
+    context['form'] = form
+    return render(request, 'core/add_review.html', context)
 
 
 @login_required
@@ -445,9 +237,9 @@ def edit_review(request, review_id):
     
     if request.method == 'POST':
         form = ReviewForm(request.POST, instance=review)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Отзыв успешно обновлен!')
+        success, message = ReviewService.process_edit_review(review, form)
+        if success:
+            messages.success(request, message)
             return redirect('core:seller_profile', user_id=review.seller.id)
     else:
         form = ReviewForm(instance=review)
@@ -459,11 +251,10 @@ def edit_review(request, review_id):
 def delete_review(request, review_id):
     """Удалить свой отзыв"""
     review = get_object_or_404(Review, id=review_id, buyer=request.user)
-    seller_id = review.seller.id
     
     if request.method == 'POST':
-        review.delete()
-        messages.success(request, 'Отзыв успешно удален!')
+        seller_id, message = ReviewService.process_delete_review(review)
+        messages.success(request, message)
         return redirect('core:seller_profile', user_id=seller_id)
     
     return render(request, 'core/delete_review_confirm.html', {'review': review})
@@ -473,19 +264,7 @@ def delete_review(request, review_id):
 @login_required
 def my_profile(request):
     """Личный профиль пользователя"""
-    profile, created = UserProfile.objects.get_or_create(user=request.user)
-    
-    # Получаем отзывы о пользователе
-    reviews = Review.objects.filter(seller=request.user).select_related('buyer')
-    
-    context = {
-        'profile': profile,
-        'reviews': reviews,
-        'average_rating': profile.get_average_rating(),
-        'reviews_count': profile.get_reviews_count(),
-        'sales_count': profile.get_sales_count(),
-    }
-    
+    context = ProfileService.get_my_profile_context(request)
     return render(request, 'core/my_profile.html', context)
 
 
@@ -494,9 +273,9 @@ def edit_profile(request):
     """Редактирование профиля"""
     if request.method == 'POST':
         form = UserUpdateForm(request.POST, instance=request.user)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Профиль успешно обновлен!')
+        success, message = ProfileService.process_edit_profile(request, form)
+        if success:
+            messages.success(request, message)
             return redirect('core:my_profile')
     else:
         form = UserUpdateForm(instance=request.user)
@@ -509,28 +288,13 @@ def change_password(request):
     """Смена пароля"""
     if request.method == 'POST':
         form = PasswordChangeCustomForm(request.POST)
-        if form.is_valid():
-            old_password = form.cleaned_data['old_password']
-            new_password1 = form.cleaned_data['new_password1']
-            new_password2 = form.cleaned_data['new_password2']
-            
-            # Проверяем старый пароль
-            if not request.user.check_password(old_password):
-                messages.error(request, 'Неверный текущий пароль')
-            elif new_password1 != new_password2:
-                messages.error(request, 'Новые пароли не совпадают')
-            elif len(new_password1) < 8:
-                messages.error(request, 'Пароль должен содержать минимум 8 символов')
-            else:
-                # Меняем пароль
-                request.user.set_password(new_password1)
-                request.user.save()
-                
-                # Обновляем сессию, чтобы пользователь не вышел из системы
-                update_session_auth_hash(request, request.user)
-                
-                messages.success(request, 'Пароль успешно изменен!')
-                return redirect('core:my_profile')
+        success, message = ProfileService.process_change_password(request, form)
+        if success:
+            update_session_auth_hash(request, request.user)
+            messages.success(request, message)
+            return redirect('core:my_profile')
+        elif message:
+            messages.error(request, message)
     else:
         form = PasswordChangeCustomForm()
     
@@ -541,72 +305,25 @@ def change_password(request):
 @login_required
 def chats_list(request):
     """Список всех чатов пользователя"""
-    # Получаем все чаты где пользователь участвует
-    chats = Chat.objects.filter(
-        Q(user1=request.user) | Q(user2=request.user)
-    ).select_related('user1', 'user2', 'car').prefetch_related('messages')
-    
-    # Подготавливаем данные для отображения
-    chats_data = []
-    total_unread = 0
-    
-    for chat in chats:
-        other_user = chat.get_other_user(request.user)
-        last_message = chat.get_last_message()
-        unread_count = chat.get_unread_count(request.user)
-        total_unread += unread_count
-        
-        chats_data.append({
-            'chat': chat,
-            'other_user': other_user,
-            'last_message': last_message,
-            'unread_count': unread_count,
-        })
-    
-    context = {
-        'chats_data': chats_data,
-        'total_unread': total_unread,
-    }
-    
+    context = ChatService.get_chats_list_context(request)
     return render(request, 'core/chats_list.html', context)
 
 
 @login_required
 def chat_detail(request, chat_id):
     """Детальный просмотр чата и отправка сообщений"""
-    chat = get_object_or_404(Chat, id=chat_id)
+    context = ChatService.get_chat_detail_context(request, chat_id)
+    chat = context['chat']
     
-    # Проверяем, что пользователь участвует в этом чате
     if request.user not in [chat.user1, chat.user2]:
         messages.error(request, 'У вас нет доступа к этому чату')
         return redirect('core:chats_list')
     
-    # Отмечаем все сообщения как прочитанные
-    Message.objects.filter(chat=chat, is_read=False).exclude(sender=request.user).update(is_read=True)
-    
-    # Обработка отправки сообщения
     if request.method == 'POST':
         text = request.POST.get('message_text', '').strip()
         if text:
-            Message.objects.create(
-                chat=chat,
-                sender=request.user,
-                text=text
-            )
-            # Обновляем время последнего обновления чата
-            chat.save()
+            ChatService.create_message(chat, request.user, text)
             return redirect('core:chat_detail', chat_id=chat.id)
-    
-    # Получаем все сообщения (в обратном порядке для отображения)
-    messages_list = chat.messages.select_related('sender').order_by('created_at')
-    
-    other_user = chat.get_other_user(request.user)
-    
-    context = {
-        'chat': chat,
-        'messages_list': messages_list,
-        'other_user': other_user,
-    }
     
     return render(request, 'core/chat_detail.html', context)
 
@@ -614,25 +331,13 @@ def chat_detail(request, chat_id):
 @login_required
 def start_chat(request, seller_id, car_id):
     """Начать чат с продавцом по конкретному автомобилю"""
-    seller = get_object_or_404(User, id=seller_id)
-    car = get_object_or_404(Car, id=car_id)
+    chat, created, message, error_car_id = ChatService.process_start_chat(request, seller_id, car_id)
     
-    # Нельзя начать чат с самим собой
-    if request.user == seller:
-        messages.error(request, 'Вы не можете начать чат с самим собой')
-        return redirect('core:car_detail', car_id=car.id)
+    if chat is None:
+        messages.error(request, message)
+        return redirect('core:car_detail', car_id=error_car_id)
     
-    # Проверяем, существует ли уже чат
-    # Нормализуем порядок пользователей (меньший ID всегда user1)
-    user1, user2 = (request.user, seller) if request.user.id < seller.id else (seller, request.user)
-    
-    chat, created = Chat.objects.get_or_create(
-        user1=user1,
-        user2=user2,
-        car=car
-    )
-    
-    if created:
-        messages.success(request, f'Чат с {seller.username} создан')
+    if message:
+        messages.success(request, message)
     
     return redirect('core:chat_detail', chat_id=chat.id)
