@@ -51,7 +51,7 @@
                 
                 <div class="mt-auto">
                     <div class="mb-3">
-                        <span class="price-badge">{{ car.price|floatformat:0 }} ₽</span>
+                        <span class="price-badge">{{ car.price|floatformat:0 }} $</span>
                     </div>
                     <div class="d-grid gap-2">
                         <a href="{% url 'core:car_detail' car.id %}" class="btn btn-primary btn-sm">
