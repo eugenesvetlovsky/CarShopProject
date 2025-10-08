@@ -274,13 +274,13 @@ class OrderService:
     @staticmethod
     def get_my_orders_context(request):
         """Получить контекст моих заказов"""
-        orders = Order.objects.filter(user=request.user).select_related('car').order_by('-created_at')
+        orders = Order.objects.filter(user=request.user).select_related('car', 'car__seller').order_by('-created_at')
         return {'orders': orders}
     
     @staticmethod
     def get_order_success_context(request, order_id):
         """Получить контекст успешного заказа"""
-        order = Order.objects.get(id=order_id, user=request.user)
+        order = Order.objects.select_related('car', 'car__seller').get(id=order_id, user=request.user)
         return {'order': order}
     
     @staticmethod
