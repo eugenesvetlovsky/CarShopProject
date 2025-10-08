@@ -8,6 +8,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.conf import settings
 from .models import Car, Favorite, Cart, Order, Review, UserProfile, Chat, Message
+from . import forms
 
 
 # ==================== АВТОМОБИЛИ ====================
@@ -96,29 +97,55 @@ class CarService:
         return car
     
     @staticmethod
-    def process_add_car(request, form):
-        """Обработать добавление автомобиля"""
-        if form.is_valid():
-            car = form.save(commit=False)
-            car.seller = request.user
-            car.available = True
-            car.save()
-            return True, 'Автомобиль успешно добавлен на продажу!'
-        return False, None
+    def process_add_car(request):
+        """Обработать добавление автомобиля - полная логика"""
+        from django.contrib import messages
+        
+        if request.method == 'POST':
+            form = forms.CarForm(request.POST, request.FILES)
+            if form.is_valid():
+                car = form.save(commit=False)
+                car.seller = request.user
+                car.available = True
+                car.save()
+                messages.success(request, 'Автомобиль успешно добавлен на продажу!')
+                return {'redirect': 'core:my_listings'}
+        else:
+            form = forms.CarForm()
+        
+        return {'form': form}
     
     @staticmethod
-    def process_edit_car(request, car, form):
-        """Обработать редактирование автомобиля"""
-        if form.is_valid():
-            form.save()
-            return True, 'Объявление успешно обновлено!'
-        return False, None
+    def process_edit_car(request, car_id):
+        """Обработать редактирование автомобиля - полная логика"""
+        from django.contrib import messages
+        
+        car = Car.objects.get(id=car_id, seller=request.user)
+        
+        if request.method == 'POST':
+            form = forms.CarForm(request.POST, request.FILES, instance=car)
+            if form.is_valid():
+                form.save()
+                messages.success(request, 'Объявление успешно обновлено!')
+                return {'redirect': 'core:my_listings'}
+        else:
+            form = forms.CarForm(instance=car)
+        
+        return {'form': form, 'car': car}
     
     @staticmethod
-    def process_delete_car(car):
-        """Обработать удаление автомобиля"""
-        car.delete()
-        return 'Объявление успешно удалено!'
+    def process_delete_car(request, car_id):
+        """Обработать удаление автомобиля - полная логика"""
+        from django.contrib import messages
+        
+        car = Car.objects.get(id=car_id, seller=request.user)
+        
+        if request.method == 'POST':
+            car.delete()
+            messages.success(request, 'Объявление успешно удалено!')
+            return {'redirect': 'core:my_listings'}
+        
+        return {'car': car}
 
 
 # ==================== ИЗБРАННОЕ ====================
@@ -159,15 +186,26 @@ class FavoriteService:
     
     @staticmethod
     def process_toggle_favorite(request, car_id):
-        """Обработать переключение избранного"""
+        """Обработать переключение избранного - полная логика"""
+        from django.contrib import messages
+        
         car = Car.objects.get(id=car_id)
         favorite, created = Favorite.objects.get_or_create(user=request.user, car=car)
         
         if not created:
             favorite.delete()
-            return False, 'Удалено из избранного'
+            is_favorite = False
+            message = 'Удалено из избранного'
+        else:
+            is_favorite = True
+            message = 'Добавлено в избранное'
         
-        return True, 'Добавлено в избранное'
+        # Для AJAX запросов
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return {'ajax': True, 'is_favorite': is_favorite, 'message': message}
+        
+        messages.success(request, message)
+        return {'redirect_referer': True}
 
 
 # ==================== КОРЗИНА ====================
@@ -209,18 +247,23 @@ class CartService:
     
     @staticmethod
     def process_add_to_cart(request, car_id):
-        """Обработать добавление в корзину"""
+        """Обработать добавление в корзину - полная логика"""
+        from django.contrib import messages
+        
         car = Car.objects.get(id=car_id)
         
         if not car.available:
-            return False, 'Этот автомобиль уже недоступен для покупки'
+            messages.info(request, 'Этот автомобиль уже недоступен для покупки')
+            return {'redirect_referer': True}
         
         cart_item, created = Cart.objects.get_or_create(user=request.user, car=car)
         
         if created:
-            return True, f'{car.brand} {car.model} добавлен в корзину'
+            messages.success(request, f'{car.brand} {car.model} добавлен в корзину')
+        else:
+            messages.info(request, 'Этот автомобиль уже в вашей корзине')
         
-        return False, 'Этот автомобиль уже в вашей корзине'
+        return {'redirect_referer': True}
 
 
 # ==================== ЗАКАЗЫ ====================
@@ -239,6 +282,26 @@ class OrderService:
         """Получить контекст успешного заказа"""
         order = Order.objects.get(id=order_id, user=request.user)
         return {'order': order}
+    
+    @staticmethod
+    def process_checkout(request):
+        """Обработать оформление заказа - полная логика"""
+        from django.contrib import messages
+        
+        orders, result = OrderService.create_orders_from_cart(request.user)
+        
+        if not orders:
+            messages.warning(request, result)
+            return {'redirect': 'core:cart'}
+        
+        success, message = OrderService.send_order_confirmation_email(request.user, orders, result)
+        
+        if success:
+            messages.success(request, message)
+        else:
+            messages.warning(request, message)
+        
+        return {'redirect': 'core:order_success', 'redirect_args': {'order_id': orders[0].id}}
     
     @staticmethod
     def create_orders_from_cart(user):
@@ -383,33 +446,68 @@ class ReviewService:
         }
     
     @staticmethod
-    def process_add_review(request, seller, order, form):
-        """Обработать добавление отзыва"""
-        if form.is_valid():
-            ReviewService.create_review(
-                seller=seller,
-                buyer=request.user,
-                order=order,
-                rating=form.cleaned_data['rating'],
-                comment=form.cleaned_data['comment']
-            )
-            return True, 'Спасибо за ваш отзыв!'
-        return False, None
+    def process_add_review(request, seller_id, order_id):
+        """Обработать добавление отзыва - полная логика"""
+        from django.contrib.auth.models import User
+        from django.contrib import messages
+        
+        seller = User.objects.get(id=seller_id)
+        order = Order.objects.get(id=order_id, user=request.user, car__seller=seller, status='completed')
+        
+        can_review, error_message = ReviewService.can_add_review(request.user, seller, order)
+        if not can_review:
+            messages.error(request, error_message)
+            return {'redirect': f'core:seller_profile', 'redirect_args': {'user_id': seller_id}}
+        
+        if request.method == 'POST':
+            form = forms.ReviewForm(request.POST)
+            if form.is_valid():
+                ReviewService.create_review(
+                    seller=seller,
+                    buyer=request.user,
+                    order=order,
+                    rating=form.cleaned_data['rating'],
+                    comment=form.cleaned_data['comment']
+                )
+                messages.success(request, 'Спасибо за ваш отзыв!')
+                return {'redirect': f'core:seller_profile', 'redirect_args': {'user_id': seller_id}}
+        else:
+            form = forms.ReviewForm()
+        
+        return {'form': form, 'seller': seller, 'order': order}
     
     @staticmethod
-    def process_edit_review(review, form):
-        """Обработать редактирование отзыва"""
-        if form.is_valid():
-            form.save()
-            return True, 'Отзыв успешно обновлен!'
-        return False, None
+    def process_edit_review(request, review_id):
+        """Обработать редактирование отзыва - полная логика"""
+        from django.contrib import messages
+        
+        review = Review.objects.get(id=review_id, buyer=request.user)
+        
+        if request.method == 'POST':
+            form = forms.ReviewForm(request.POST, instance=review)
+            if form.is_valid():
+                form.save()
+                messages.success(request, 'Отзыв успешно обновлен!')
+                return {'redirect': 'core:seller_profile', 'redirect_args': {'user_id': review.seller.id}}
+        else:
+            form = forms.ReviewForm(instance=review)
+        
+        return {'form': form, 'review': review}
     
     @staticmethod
-    def process_delete_review(review):
-        """Обработать удаление отзыва"""
+    def process_delete_review(request, review_id):
+        """Обработать удаление отзыва - полная логика"""
+        from django.contrib import messages
+        
+        review = Review.objects.get(id=review_id, buyer=request.user)
         seller_id = review.seller.id
-        review.delete()
-        return seller_id, 'Отзыв успешно удален!'
+        
+        if request.method == 'POST':
+            review.delete()
+            messages.success(request, 'Отзыв успешно удален!')
+            return {'redirect': 'core:seller_profile', 'redirect_args': {'user_id': seller_id}}
+        
+        return {'review': review}
 
 
 # ==================== ЧАТЫ ====================
@@ -466,6 +564,40 @@ class ChatService:
         }
     
     @staticmethod
+    def process_chat_detail(request, chat_id):
+        """Обработать детальный просмотр чата - полная логика"""
+        from django.contrib import messages as django_messages
+        
+        chat = Chat.objects.get(id=chat_id)
+        
+        # Проверка доступа
+        if request.user not in [chat.user1, chat.user2]:
+            django_messages.error(request, 'У вас нет доступа к этому чату')
+            return {'redirect': 'core:chats_list'}
+        
+        # Отмечаем сообщения как прочитанные
+        Message.objects.filter(
+            chat=chat,
+            is_read=False
+        ).exclude(sender=request.user).update(is_read=True)
+        
+        # Обработка отправки сообщения
+        if request.method == 'POST':
+            text = request.POST.get('message_text', '').strip()
+            if text:
+                ChatService.create_message(chat, request.user, text)
+                return {'redirect': 'core:chat_detail', 'redirect_args': {'chat_id': chat.id}}
+        
+        messages_list = chat.messages.select_related('sender').order_by('created_at')
+        other_user = chat.get_other_user(request.user)
+        
+        return {
+            'chat': chat,
+            'messages_list': messages_list,
+            'other_user': other_user,
+        }
+    
+    @staticmethod
     def create_message(chat, sender, text):
         """Создать сообщение"""
         message = Message.objects.create(
@@ -492,18 +624,23 @@ class ChatService:
     
     @staticmethod
     def process_start_chat(request, seller_id, car_id):
-        """Обработать начало чата"""
+        """Обработать начало чата - полная логика"""
         from django.contrib.auth.models import User
+        from django.contrib import messages
+        
         seller = User.objects.get(id=seller_id)
         car = Car.objects.get(id=car_id)
         
         if request.user == seller:
-            return None, False, 'Вы не можете начать чат с самим собой', car_id
+            messages.error(request, 'Вы не можете начать чат с самим собой')
+            return {'redirect': 'core:car_detail', 'redirect_args': {'car_id': car_id}}
         
         chat, created = ChatService.get_or_create_chat(request.user, seller, car)
         
-        message = f'Чат с {seller.username} создан' if created else None
-        return chat, created, message, None
+        if created:
+            messages.success(request, f'Чат с {seller.username} создан')
+        
+        return {'redirect': 'core:chat_detail', 'redirect_args': {'chat_id': chat.id}}
 
 
 # ==================== ПРОФИЛЬ ====================
@@ -551,36 +688,48 @@ class ProfileService:
         }
     
     @staticmethod
-    def process_edit_profile(request, form):
-        """Обработать редактирование профиля"""
-        if form.is_valid():
-            form.save()
-            return True, 'Профиль успешно обновлен!'
-        return False, None
+    def process_edit_profile(request):
+        """Обработать редактирование профиля - полная логика"""
+        from django.contrib import messages
+        
+        if request.method == 'POST':
+            form = forms.UserUpdateForm(request.POST, instance=request.user)
+            if form.is_valid():
+                form.save()
+                messages.success(request, 'Профиль успешно обновлен!')
+                return {'redirect': 'core:my_profile'}
+        else:
+            form = forms.UserUpdateForm(instance=request.user)
+        
+        return {'form': form}
     
     @staticmethod
-    def process_change_password(request, form):
-        """Обработать смену пароля"""
-        if not form.is_valid():
-            return False, None
+    def process_change_password(request):
+        """Обработать смену пароля - полная логика"""
+        from django.contrib import messages
         
-        old_password = form.cleaned_data['old_password']
-        new_password1 = form.cleaned_data['new_password1']
-        new_password2 = form.cleaned_data['new_password2']
+        if request.method == 'POST':
+            form = forms.PasswordChangeCustomForm(request.POST)
+            if form.is_valid():
+                old_password = form.cleaned_data['old_password']
+                new_password1 = form.cleaned_data['new_password1']
+                new_password2 = form.cleaned_data['new_password2']
+                
+                if not request.user.check_password(old_password):
+                    messages.error(request, 'Неверный текущий пароль')
+                elif new_password1 != new_password2:
+                    messages.error(request, 'Новые пароли не совпадают')
+                elif len(new_password1) < 8:
+                    messages.error(request, 'Пароль должен содержать минимум 8 символов')
+                else:
+                    request.user.set_password(new_password1)
+                    request.user.save()
+                    messages.success(request, 'Пароль успешно изменен!')
+                    return {'redirect': 'core:my_profile', 'update_session': True}
+        else:
+            form = forms.PasswordChangeCustomForm()
         
-        if not request.user.check_password(old_password):
-            return False, 'Неверный текущий пароль'
-        
-        if new_password1 != new_password2:
-            return False, 'Новые пароли не совпадают'
-        
-        if len(new_password1) < 8:
-            return False, 'Пароль должен содержать минимум 8 символов'
-        
-        request.user.set_password(new_password1)
-        request.user.save()
-        
-        return True, 'Пароль успешно изменен!'
+        return {'form': form}
 
 
 # ==================== АУТЕНТИФИКАЦИЯ ====================
@@ -589,25 +738,51 @@ class AuthService:
     """Сервис для аутентификации"""
     
     @staticmethod
-    def process_registration(request, form):
-        """Обработать регистрацию"""
-        if form.is_valid():
-            user = form.save()
-            return True, user, 'Регистрация прошла успешно! Добро пожаловать!'
-        return False, None, None
+    def process_registration(request):
+        """Обработать регистрацию - полная логика"""
+        from django.contrib.auth import login
+        from django.contrib import messages
+        
+        # Если уже авторизован - редирект
+        if request.user.is_authenticated:
+            return {'redirect': 'core:car_list'}
+        
+        # POST запрос - обработка формы
+        if request.method == 'POST':
+            form = forms.RegisterForm(request.POST)
+            if form.is_valid():
+                user = form.save()
+                login(request, user)
+                messages.success(request, 'Регистрация прошла успешно! Добро пожаловать!')
+                return {'redirect': 'core:car_list'}
+        else:
+            form = forms.RegisterForm()
+        
+        return {'form': form}
     
     @staticmethod
-    def process_login(request, form):
-        """Обработать вход"""
-        if form.is_valid():
-            username = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password')
-            user = None
-            
-            from django.contrib.auth import authenticate
-            user = authenticate(username=username, password=password)
-            
-            if user is not None:
-                return True, user, f'Добро пожаловать, {username}!'
+    def process_login(request):
+        """Обработать вход - полная логика"""
+        from django.contrib.auth import login, authenticate
+        from django.contrib import messages
         
-        return False, None, None
+        # Если уже авторизован - редирект
+        if request.user.is_authenticated:
+            return {'redirect': 'core:car_list'}
+        
+        # POST запрос - обработка формы
+        if request.method == 'POST':
+            form = forms.LoginForm(request, data=request.POST)
+            if form.is_valid():
+                username = form.cleaned_data.get('username')
+                password = form.cleaned_data.get('password')
+                user = authenticate(username=username, password=password)
+                
+                if user is not None:
+                    login(request, user)
+                    messages.success(request, f'Добро пожаловать, {username}!')
+                    return {'redirect': 'core:car_list'}
+        else:
+            form = forms.LoginForm()
+        
+        return {'form': form}
