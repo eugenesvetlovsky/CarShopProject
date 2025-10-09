@@ -103,9 +103,26 @@
         
         .badge-notification {
             position: absolute;
-            top: 5px;
-            right: 5px;
+            top: -7px;
+            right: -12px;
+            background: #ff0000;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 0.7rem;
+            font-weight: bold;
+            line-height: 1;
+            padding: 0;
+            border: none;
+        }
+        
+        /* Hide badge when count is 0 */
+        .badge-notification:empty {
+            display: none;
         }
         
         /* Hero Section */
@@ -331,15 +348,32 @@
                     </li>
                     {% if user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'core:favorites' %}">
-                            <i class="bi bi-heart-fill"></i>
-                            <span>Избранное</span>
+                        <a class="nav-link" href="{% url 'core:cart' %}">
+                            <div class="position-relative d-inline-block">
+                                <i class="bi bi-cart-fill"></i>
+                                <span class="badge-notification">{{ cart_count|default:0 }}</span>
+                            </div>
+                            <span>Корзина</span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'core:cart' %}">
-                            <i class="bi bi-cart-fill"></i>
-                            <span>Корзина</span>
+                        <a class="nav-link" href="{% url 'core:favorites' %}">
+                            <div class="position-relative d-inline-block">
+                                <i class="bi bi-heart-fill"></i>
+                                <span class="badge-notification">{{ favorites_count|default:0 }}</span>
+                            </div>
+                            <span>Избранное</span>
+                        </a>
+                    </li>
+                    <li class="nav-item position-relative">
+                        <a class="nav-link" href="{% url 'core:chats_list' %}">
+                            <div class="position-relative d-inline-block">
+                                <i class="bi bi-chat-dots"></i>
+                                {% if total_unread_messages > 0 %}
+                                    <span class="badge-notification">{{ total_unread_messages }}</span>
+                                {% endif %}
+                            </div>
+                            <span>Чаты</span>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -352,17 +386,6 @@
                         <a class="nav-link" href="{% url 'core:my_listings' %}">
                             <i class="bi bi-card-list"></i>
                             <span>Мои объявления</span>
-                        </a>
-                    </li>
-                    <li class="nav-item position-relative">
-                        <a class="nav-link" href="{% url 'core:chats_list' %}">
-                            <i class="bi bi-chat-dots"></i>
-                            <span>Чаты</span>
-                            {% if total_unread_messages > 0 %}
-                                <span class="badge bg-danger rounded-pill position-absolute top-0 start-100 translate-middle">
-                                    {{ total_unread_messages }}
-                                </span>
-                            {% endif %}
                         </a>
                     </li>
                     {% endif %}
