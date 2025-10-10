@@ -583,8 +583,10 @@ class ChatService:
         
         # Обработка отправки сообщения
         if request.method == 'POST':
+            # Получаем текст сообщения без удаления переносов строк
             text = request.POST.get('message_text', '').strip()
             if text:
+                # Сохраняем сообщение с сохранением переносов строк
                 ChatService.create_message(chat, request.user, text)
                 return {'redirect': 'core:chat_detail', 'redirect_args': {'chat_id': chat.id}}
         
@@ -600,21 +602,20 @@ class ChatService:
     @staticmethod
     def create_message(chat, sender, text):
         """Создать сообщение"""
-        message = Message.objects.create(
+        # Заменяем временные маркеры обратно на переносы строк
+        text = text.replace('{{LINE_BREAK}}', '\n')
+        return Message.objects.create(
             chat=chat,
             sender=sender,
-            text=text
+            text=text,
+            is_read=(sender == chat.user1 or sender == chat.user2)
         )
-        chat.save()
-        return message
     
     @staticmethod
     def get_or_create_chat(user1, user2, car):
         """Получить или создать чат"""
         if user1.id > user2.id:
-            user1, user2 = user2, user1
-        
-        chat, created = Chat.objects.get_or_create(
+            chat, created = Chat.objects.get_or_create(
             user1=user1,
             user2=user2,
             car=car

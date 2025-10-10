@@ -46,7 +46,7 @@
                                             <i class="bi bi-envelope-fill"></i> Новое
                                         </span>
                                     {% endif %}
-                                    <p class="mb-1">{{ message.text }}</p>
+                                    <div class="mb-1" style="white-space: pre-wrap;">{{ message.text }}</div>
                                     <small class="{% if message.sender == request.user %}text-white-50{% else %}text-muted{% endif %}">
                                         {{ message.created_at|date:"H:i" }}
                                         {% if message.sender == request.user %}
@@ -140,10 +140,44 @@ document.addEventListener('DOMContentLoaded', function() {
     // Фокус на поле ввода
     document.getElementById('messageInput').focus();
     
-    // Отправка по Ctrl+Enter
+    // Обработка отправки формы с сохранением переносов строк
+    document.getElementById('messageForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const textarea = document.getElementById('messageInput');
+        const form = this;
+        
+        // Создаем временный скрытый input для отправки
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'message_text';
+        // Отправляем текст как есть, с сохранением переносов строк
+        hiddenInput.value = textarea.value;
+        
+        // Очищаем предыдущие скрытые поля (если есть)
+        const oldHiddenInputs = form.querySelectorAll('input[type="hidden"][name="message_text"]');
+        oldHiddenInputs.forEach(el => el.remove());
+        
+        // Добавляем новое скрытое поле и отправляем форму
+        form.appendChild(hiddenInput);
+        form.submit();
+    });
+    
+    // Обработка нажатия Enter (без Shift или Ctrl)
+    document.getElementById('messageInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) {
+            e.preventDefault();
+            document.getElementById('messageForm').dispatchEvent(new Event('submit'));
+        }
+    });
+    
+    // Обработка Ctrl+Enter для вставки переноса строки
     document.getElementById('messageInput').addEventListener('keydown', function(e) {
         if (e.ctrlKey && e.key === 'Enter') {
-            document.getElementById('messageForm').submit();
+            e.preventDefault();
+            const start = this.selectionStart;
+            const end = this.selectionEnd;
+            this.value = this.value.substring(0, start) + '\n' + this.value.substring(end);
+            this.selectionStart = this.selectionEnd = start + 1;
         }
     });
 });
