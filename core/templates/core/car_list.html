@@ -2,6 +2,72 @@
 
 {% block title %}Каталог автомобилей - CarShop{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Стили для кликабельной карточки */
+    .card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        cursor: pointer;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .card-clickable-area::before {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        background-color: transparent;
+        content: "";
+    }
+    
+    /* Убираем подчеркивание у ссылок внутри карточки */
+    .card a:not(.btn) {
+        text-decoration: none;
+    }
+    
+    /* Стили для кнопок, чтобы они были поверх кликабельной области */
+    .btn {
+        position: relative;
+        z-index: 3;
+    }
+    
+    /* Стили для цены */
+    .price-badge {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #2c3e50;
+        background-color: #f8f9fa;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .card:hover .price-badge {
+        background-color: #fff;
+        box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.1);
+    }
+    
+    /* Стили для изображения по умолчанию */
+    .no-image {
+        height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        color: #6c757d;
+    }
+    
+    .no-image i {
+        font-size: 4rem;
+    }
+</style>
+{% endblock %}
+
 {% block hero %}
 <div class="hero-section">
     <div class="container text-center">
@@ -99,7 +165,9 @@
 <div class="row g-4">
     {% for car in cars %}
     <div class="col-lg-4 col-md-6">
-        <div class="card h-100">
+        <div class="card h-100 position-relative">
+            <a href="{% url 'core:car_detail' car.id %}" class="stretched-link card-clickable-area"></a>
+            
             {% if car.image %}
                 <img src="{{ car.image.url }}" class="card-img-top" alt="{{ car.brand }} {{ car.model }}">
             {% else %}
@@ -126,21 +194,24 @@
                     </p>
                 {% endif %}
                 
-                <div class="mt-auto">
+                <div class="mt-auto position-relative" style="z-index: 2;">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <span class="price-badge">{{ car.price|floatformat:0 }} $</span>
                         {% if user.is_authenticated %}
-                            <a href="{% url 'core:toggle_favorite' car.id %}" class="btn btn-sm {% if car.id in favorite_ids %}btn-danger{% else %}btn-outline-danger{% endif %}">
+                            <a href="{% url 'core:toggle_favorite' car.id %}" class="btn btn-sm {% if car.id in favorite_ids %}btn-danger{% else %}btn-outline-danger{% endif %} position-relative" style="z-index: 3;"
+                               onclick="event.stopPropagation();">
                                 <i class="bi bi-heart{% if car.id in favorite_ids %}-fill{% endif %}"></i>
                             </a>
                         {% endif %}
                     </div>
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'core:car_detail' car.id %}" class="btn btn-primary">
+                    <div class="d-grid gap-2 position-relative" style="z-index: 3;">
+                        <a href="{% url 'core:car_detail' car.id %}" class="btn btn-primary"
+                           onclick="event.stopPropagation();">
                             <i class="bi bi-eye"></i> Подробнее
                         </a>
                         {% if user.is_authenticated %}
-                            <a href="{% url 'core:add_to_cart' car.id %}" class="btn btn-success">
+                            <a href="{% url 'core:add_to_cart' car.id %}" class="btn btn-success"
+                               onclick="event.stopPropagation();">
                                 <i class="bi bi-cart-plus"></i> В корзину
                             </a>
                         {% endif %}
