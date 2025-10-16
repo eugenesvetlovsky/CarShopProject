@@ -2,6 +2,72 @@
 
 {% block title %}{{ car.brand }} {{ car.model }} - CarShop{% endblock %}
 
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Обработчик для кнопки избранного
+        const favoriteBtn = document.querySelector('.favorite-btn');
+        if (favoriteBtn) {
+            favoriteBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const url = this.href;
+                const icon = this.querySelector('i');
+                const text = this.querySelector('.favorite-text');
+                
+                // Отправляем AJAX-запрос
+                fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Обновляем иконку, классы кнопки и текст
+                    if (data.is_favorite) {
+                        icon.className = 'bi bi-heart-fill';
+                        this.classList.remove('btn-outline-danger');
+                        this.classList.add('btn-danger');
+                        if (text) text.textContent = ' Удалить из избранного';
+                    } else {
+                        icon.className = 'bi bi-heart';
+                        this.classList.remove('btn-danger');
+                        this.classList.add('btn-outline-danger');
+                        if (text) text.textContent = ' Добавить в избранное';
+                    }
+                    
+                    // Обновляем счетчик избранного в навигации
+                    updateFavoritesCounter(data.is_favorite);
+                    
+                    // Показываем уведомление
+                    if (data.message) {
+                        // Можно добавить красивый тост или уведомление
+                        console.log(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при обновлении избранного:', error);
+                    // В случае ошибки перенаправляем на страницу входа
+                    window.location.href = '{% url 'core:login' %}';
+                });
+            });
+        }
+        
+        // Функция для обновления счетчика избранного
+        function updateFavoritesCounter(isAdded) {
+            const favoritesCountElement = document.querySelector('a[href*="favorites"] .badge-notification');
+            if (favoritesCountElement) {
+                let currentCount = parseInt(favoritesCountElement.textContent) || 0;
+                currentCount += isAdded ? 1 : -1;
+                favoritesCountElement.textContent = Math.max(0, currentCount);
+            }
+        }
+    });
+</script>
+{% endblock %}
+
 {% block content %}
 <nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
@@ -26,9 +92,11 @@
         <!-- Action Buttons -->
         <div class="mt-3 d-grid gap-2">
             {% if user.is_authenticated %}
-                <a href="{% url 'core:toggle_favorite' car.id %}" class="btn {% if is_favorite %}btn-danger{% else %}btn-outline-danger{% endif %} btn-lg">
+                <a href="{% url 'core:toggle_favorite' car.id %}" 
+                   class="btn {% if is_favorite %}btn-danger{% else %}btn-outline-danger{% endif %} btn-lg favorite-btn"
+                   data-car-id="{{ car.id }}">
                     <i class="bi bi-heart{% if is_favorite %}-fill{% endif %}"></i>
-                    {% if is_favorite %}Удалить из избранного{% else %}Добавить в избранное{% endif %}
+                    <span class="favorite-text">{% if is_favorite %} Удалить из избранного{% else %} Добавить в избранное{% endif %}</span>
                 </a>
             {% else %}
                 <a href="{% url 'core:login' %}" class="btn btn-outline-danger btn-lg">

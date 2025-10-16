@@ -49,7 +49,7 @@ def toggle_favorite(request, car_id):
 def favorites_view(request):
     """Избранное"""
     context = FavoriteService.get_favorites_context(request)
-    return render(request, 'core/favorites.html', context)
+    return render(request, 'core/favorites_new.html', context)
 
 
 @login_required

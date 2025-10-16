@@ -1,0 +1,183 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Избранное - CarShop{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Обработчик для всех кнопок избранного на странице
+        document.querySelectorAll('.favorite-btn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const url = this.href;
+                const card = this.closest('.card');
+                const icon = this.querySelector('i');
+                const favoritesCountElement = document.querySelector('a[href*="favorites"] .badge-notification');
+                const favoritesCountBadge = document.querySelector('.favorites-count');
+                const favoritesContainer = document.querySelector('.favorites-container');
+                
+                // Отправляем AJAX-запрос
+                fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Удаляем карточку из DOM
+                    if (card) {
+                        card.style.opacity = '0';
+                        setTimeout(() => {
+                            card.remove();
+                            
+                            // Обновляем счетчик в заголовке
+                            if (favoritesCountBadge) {
+                                const currentCount = parseInt(favoritesCountBadge.textContent) || 0;
+                                const newCount = Math.max(0, currentCount - 1);
+                                favoritesCountBadge.textContent = newCount;
+                                
+                                // Обновляем счетчик в навигации
+                                if (favoritesCountElement) {
+                                    favoritesCountElement.textContent = newCount;
+                                }
+                                
+                                // Если это был последний элемент, показываем сообщение
+                                if (newCount === 0 && favoritesContainer) {
+                                    favoritesContainer.innerHTML = `
+                                        <div class="col-12">
+                                            <div class="card text-center p-5">
+                                                <div class="card-body">
+                                                    <i class="bi bi-heart text-muted" style="font-size: 5rem;"></i>
+                                                    <h3 class="mt-4">Ваш список избранного пуст</h3>
+                                                    <p class="text-muted">Добавьте автомобили в избранное, чтобы не потерять их</p>
+                                                    <a href="{% url 'core:car_list' %}" class="btn btn-primary mt-3">
+                                                        <i class="bi bi-grid-3x3-gap"></i> Перейти к каталогу
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }
+                            }
+                        }, 300);
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при обновлении избранного:', error);
+                    window.location.href = '{% url 'core:login' %}';
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h1><i class="bi bi-heart-fill"></i> Избранное</h1>
+        <p>Ваши любимые автомобили в одном месте</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>Мои избранные автомобили</h2>
+            <span class="badge bg-danger rounded-pill fs-6 favorites-count">{{ favorites|length }} авто</span>
+        </div>
+        <hr>
+    </div>
+</div>
+
+{% if favorites %}
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 favorites-container">
+    {% for favorite in favorites %}
+    <div class="col">
+        <div class="card h-100 d-flex flex-column">
+            <div style="position: relative; height: 200px; overflow: hidden;">
+                {% if favorite.car.image %}
+                    <img src="{{ favorite.car.image.url }}" class="card-img-top h-100 w-100" alt="{{ favorite.car.brand }} {{ favorite.car.model }}" style="object-fit: cover;">
+                {% else %}
+                    <div class="d-flex align-items-center justify-content-center h-100" style="background-color: #f8f9fa;">
+                        <i class="bi bi-car-front" style="font-size: 3rem; color: #6c757d;"></i>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div class="card-body d-flex flex-column">
+                <div class="mb-2">
+                    <span class="badge bg-secondary">{{ favorite.car.year }} год</span>
+                    {% if favorite.car.available %}
+                        <span class="badge bg-success">В наличии</span>
+                    {% else %}
+                        <span class="badge bg-danger">Продано</span>
+                    {% endif %}
+                </div>
+                
+                <h5 class="card-title">{{ favorite.car.brand }} {{ favorite.car.model }}</h5>
+                
+                {% if favorite.car.description %}
+                    <p class="card-text text-muted mb-3 flex-grow-0">{{ favorite.car.description|truncatewords:15 }}</p>
+                {% endif %}
+                
+                <div class="mt-auto">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="price-badge" style="font-size: 1.1rem; font-weight: 600;">{{ favorite.car.price|floatformat:0 }} $</span>
+                        <a href="{% url 'core:toggle_favorite' favorite.car.id %}" 
+                           class="btn btn-sm btn-danger favorite-btn" 
+                           data-car-id="{{ favorite.car.id }}"
+                           title="Удалить из избранного">
+                            <i class="bi bi-heart-fill"></i>
+                        </a>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'core:car_detail' favorite.car.id %}" class="btn btn-primary">
+                            <i class="bi bi-eye"></i> Подробнее
+                        </a>
+                        {% if user.is_authenticated and favorite.car.available %}
+                            <a href="{% url 'core:add_to_cart' favorite.car.id %}" class="btn btn-success"
+                               onclick="event.stopPropagation();">
+                                <i class="bi bi-cart-plus"></i> В корзину
+                            </a>
+                        {% elif not favorite.car.available %}
+                            <button class="btn btn-secondary w-100" disabled>
+                                <i class="bi bi-x-circle"></i> Нет в наличии
+                            </button>
+                        {% else %}
+                            <a href="{% url 'core:login' %}?next={% url 'core:favorites' %}" class="btn btn-success">
+                                <i class="bi bi-cart-plus"></i> В корзину
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="favorites-container">
+    <div class="row">
+        <div class="col-12">
+            <div class="card text-center p-5">
+                <div class="card-body">
+                    <i class="bi bi-heart text-muted" style="font-size: 5rem;"></i>
+                    <h3 class="mt-4">Ваш список избранного пуст</h3>
+                    <p class="text-muted">Добавьте автомобили в избранное, чтобы не потерять их</p>
+                    <a href="{% url 'core:car_list' %}" class="btn btn-primary mt-3">
+                        <i class="bi bi-grid-3x3-gap"></i> Перейти к каталогу
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

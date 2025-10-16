@@ -2,6 +2,65 @@
 
 {% block title %}Каталог автомобилей - CarShop{% endblock %}
 
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Обработчик для кнопки избранного
+        document.querySelectorAll('.favorite-btn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const url = this.href;
+                const icon = this.querySelector('i');
+                const carId = this.dataset.carId;
+                
+                // Отправляем AJAX-запрос
+                fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Обновляем иконку и классы кнопки
+                    if (data.is_favorite) {
+                        icon.className = 'bi bi-heart-fill';
+                        this.classList.remove('btn-outline-danger');
+                        this.classList.add('btn-danger');
+                    } else {
+                        icon.className = 'bi bi-heart';
+                        this.classList.remove('btn-danger');
+                        this.classList.add('btn-outline-danger');
+                    }
+                    
+                    // Обновляем счетчик избранного в навигации
+                    const favoritesCountElement = document.querySelector('a[href*="favorites"] .badge-notification');
+                    if (favoritesCountElement) {
+                        let currentCount = parseInt(favoritesCountElement.textContent) || 0;
+                        currentCount += data.is_favorite ? 1 : -1;
+                        favoritesCountElement.textContent = Math.max(0, currentCount);
+                    }
+                    
+                    // Показываем уведомление
+                    if (data.message) {
+                        // Можно добавить красивый тост или уведомление
+                        console.log(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при обновлении избранного:', error);
+                    // В случае ошибки перенаправляем на страницу входа
+                    window.location.href = '{% url 'core:login' %}';
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}
+
 {% block extra_css %}
 <style>
     /* Стили для кликабельной карточки */
@@ -198,8 +257,10 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <span class="price-badge">{{ car.price|floatformat:0 }} $</span>
                         {% if user.is_authenticated %}
-                            <a href="{% url 'core:toggle_favorite' car.id %}" class="btn btn-sm {% if car.id in favorite_ids %}btn-danger{% else %}btn-outline-danger{% endif %} position-relative" style="z-index: 3;"
-                               onclick="event.stopPropagation();">
+                            <a href="{% url 'core:toggle_favorite' car.id %}" 
+                               class="btn btn-sm {% if car.id in favorite_ids %}btn-danger{% else %}btn-outline-danger{% endif %} position-relative favorite-btn" 
+                               style="z-index: 3;"
+                               data-car-id="{{ car.id }}">
                                 <i class="bi bi-heart{% if car.id in favorite_ids %}-fill{% endif %}"></i>
                             </a>
                         {% endif %}
